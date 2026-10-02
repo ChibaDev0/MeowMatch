@@ -1,0 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/*
+ * MeowMatch design tokens — ปรับตาม reference UI (โทนน้ำเงิน, การ์ดมุมโค้ง, ฟอนต์ไทยอ่านง่าย)
+ * อ้างอิงภาพ: MeowMatch/references/ui/*
+ */
+@theme {
+  --font-sans:
+    "Noto Sans Thai", "Inter", ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+
+  /* Primary (น้ำเงิน) */
+  --color-primary-50: #eff5ff;
+  --color-primary-100: #dbe8fe;
+  --color-primary-200: #bfd6fe;
+  --color-primary-300: #93b8fd;
+  --color-primary-400: #6092fa;
+  --color-primary-500: #3b70f6;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+  --color-primary-800: #1e40af;
+  --color-primary-900: #1e3a68;
+
+  /* Semantic */
+  --color-ink: #1e293b;
+  --color-muted: #64748b;
+  --color-page: #f5f8ff;
+  --color-surface: #ffffff;
+  --color-line: #e7eef8;
+
+  /* Soft accent tiles (quick actions) */
+  --color-accent-blue: #dbeafe;
+  --color-accent-blue-fg: #2563eb;
+  --color-accent-peach: #fdecd8;
+  --color-accent-peach-fg: #ea9a34;
+  --color-accent-pink: #fce7f3;
+  --color-accent-pink-fg: #ec4899;
+  --color-accent-indigo: #e5e9ff;
+  --color-accent-indigo-fg: #4f63d2;
+
+  --radius-xl: 0.9rem;
+  --radius-2xl: 1.1rem;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ซ่อน scrollbar ของ sidebar แต่ยังเลื่อนได้ */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
