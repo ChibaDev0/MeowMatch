@@ -20,6 +20,7 @@ export type TraitOutcomeStatus =
   | "insufficient_data" // ข้อมูลไม่พอ ยังไม่เปิดผล
   | "unsupported" // ยังไม่มี ruleset ที่ผ่านตรวจสำหรับ trait นี้
   | "conflicting_evidence" // หลักฐานขัดกันจน probability เป็น 0 ทั้งหมด
+  | "blocked" // ถูก welfare gate ระงับ (เช่น Fold × Fold) — ไม่ให้คำแนะนำ
   | "budget_exceeded"; // คำนวณเกิน budget ที่กำหนด
 
 /** การกระจายผลของค่าหนึ่ง trait */
@@ -62,6 +63,8 @@ export interface EngineVersions {
 export interface PairAnalysisResult {
   kind: "pair";
   traits: TraitResult[];
+  /** คำเตือนระดับผลรวม เช่น welfare gate, ข้อจำกัดของโหมดสาธิต (07-genetics-engine §warnings) */
+  warnings: string[];
   coverage: Coverage;
   versions: EngineVersions;
 }
