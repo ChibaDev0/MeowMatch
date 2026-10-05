@@ -4,22 +4,20 @@ import { useState } from "react";
 import { SelectableCat } from "@/components/ui/selectable-cat";
 import { GatedAnalysisNote } from "@/components/ui/gated-note";
 import { HeartIcon } from "@/components/ui/icons";
-import { DEMO_DISCOVER_CATS, DEMO_MY_CATS } from "@/features/cats/demo";
-
-const LIKED = DEMO_DISCOVER_CATS.filter((c) => c.liked);
+import type { CatView } from "@/features/cats/types";
 
 /**
  * เลือกแมว 2 ตัวเพื่อวิเคราะห์ (PAIR-01)
  * A = แมวของฉันเท่านั้น; B = แมวของฉันหรือแมวที่กดใจ
  * ปุ่ม "วิเคราะห์ลูกแมว" ยังไม่คำนวณจริง — แสดง gated note (ผลเปิดใน MVP-B)
  */
-export function BreedingPicker() {
+export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; likedCats: CatView[] }) {
   const [a, setA] = useState<string | null>(null);
   const [bTab, setBTab] = useState<"mine" | "liked">("mine");
   const [b, setB] = useState<string | null>(null);
   const [showNote, setShowNote] = useState(false);
 
-  const bList = bTab === "mine" ? DEMO_MY_CATS : LIKED;
+  const bList = bTab === "mine" ? myCats : likedCats;
   const ready = a !== null && b !== null && !(bTab === "mine" && a === b);
 
   return (
@@ -31,7 +29,7 @@ export function BreedingPicker() {
             เลือกแมวตัวที่ 1 <span className="text-sm font-normal text-muted">(แมวของฉัน)</span>
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {DEMO_MY_CATS.map((cat, i) => (
+            {myCats.map((cat, i) => (
               <SelectableCat
                 key={cat.id}
                 cat={cat}
@@ -45,6 +43,9 @@ export function BreedingPicker() {
               />
             ))}
           </div>
+          {myCats.length === 0 && (
+            <p className="text-sm text-muted">ยังไม่มีแมวของฉัน — เพิ่มแมวก่อนเริ่มวิเคราะห์</p>
+          )}
         </section>
 
         {/* B */}
@@ -85,6 +86,11 @@ export function BreedingPicker() {
               />
             ))}
           </div>
+          {bList.length === 0 && (
+            <p className="text-sm text-muted">
+              {bTab === "mine" ? "ยังไม่มีแมวของฉัน" : "ยังไม่มีแมวที่กดใจไว้"}
+            </p>
+          )}
         </section>
       </div>
 

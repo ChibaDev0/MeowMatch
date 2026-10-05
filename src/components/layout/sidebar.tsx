@@ -10,7 +10,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-2 border-r border-line bg-surface px-4 py-6 md:flex">
+    <aside
+      data-testid="sidebar"
+      className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col gap-2 border-r border-line bg-surface px-4 py-6 md:flex"
+    >
       <Link href="/home" className="mb-4 px-2">
         <Logo />
       </Link>

@@ -6,6 +6,13 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Server Actions รับ FormData ที่มีไฟล์รูป — ขยายลิมิต body จากค่าเริ่มต้น 1MB
+  // ให้พอกับรูปสูงสุด 5MB (MAX_PHOTO_BYTES) + overhead ของฟิลด์อื่นและ multipart encoding
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
+  },
   // รูปภาพแมวเก็บใน Supabase Storage — อนุญาต remote pattern ของ Supabase project เท่านั้น
   // ตั้งค่า NEXT_PUBLIC_SUPABASE_URL ก่อน แล้ว host จะถูกดึงมาใช้ตอน build/runtime
   images: {

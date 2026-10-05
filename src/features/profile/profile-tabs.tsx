@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CatThumb } from "@/components/ui/cat-thumb";
 import { PlusIcon } from "@/components/ui/icons";
-import { DEMO_DISCOVER_CATS, DEMO_MY_CATS, type DemoCat } from "@/features/cats/demo";
+import type { CatView } from "@/features/cats/types";
 
 const TABS = [
   { key: "mine", label: "แมวของฉัน" },
@@ -13,9 +13,11 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-export function ProfileTabs() {
+export function ProfileTabs({ myCats, likedCats }: { myCats: CatView[]; likedCats: CatView[] }) {
   const [tab, setTab] = useState<TabKey>("mine");
-  const cats: DemoCat[] = tab === "mine" ? DEMO_MY_CATS : DEMO_DISCOVER_CATS.slice(0, 4);
+  const cats = tab === "mine" ? myCats : likedCats;
+  const emptyText =
+    tab === "mine" ? "ยังไม่มีแมว — กด “เพิ่มแมว” เพื่อเริ่มต้น" : "ยังไม่มีแมวที่กดใจ — ไปที่หน้าหาคู่เพื่อกดใจแมวที่สนใจ";
 
   return (
     <div className="space-y-4">
@@ -40,7 +42,13 @@ export function ProfileTabs() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {cats.map((cat, i) => (
           <div key={cat.id} className="space-y-2">
-            <CatThumb seed={i} className="aspect-[4/3] w-full" />
+            <CatThumb
+              seed={i}
+              src={cat.photo}
+              alt={`รูปแมว ${cat.name}`}
+              className="aspect-[4/3] w-full"
+              sizes="(max-width: 640px) 50vw, 25vw"
+            />
             <p className="text-center text-sm font-medium text-ink">{cat.name}</p>
           </div>
         ))}
@@ -56,6 +64,9 @@ export function ProfileTabs() {
           </Link>
         )}
       </div>
+
+      {cats.length === 0 && tab === "liked" && <p className="text-sm text-muted">{emptyText}</p>}
+      {cats.length === 0 && tab === "mine" && <p className="text-sm text-muted">{emptyText}</p>}
     </div>
   );
 }

@@ -31,7 +31,13 @@ export function SelectableCat({
           {badge}
         </span>
       )}
-      <CatThumb seed={seed} className="aspect-[4/3] w-full" />
+      <CatThumb
+        seed={seed}
+        src={cat.photo}
+        alt={`รูปแมว ${cat.name}`}
+        className="aspect-[4/3] w-full"
+        sizes="(max-width: 640px) 50vw, 25vw"
+      />
       <p className="mt-2 text-sm font-semibold text-ink">{cat.name}</p>
       <p className="text-xs text-muted">{cat.ageLabel}</p>
     </button>

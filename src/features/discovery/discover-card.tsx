@@ -1,28 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { CatThumb } from "@/components/ui/cat-thumb";
 import { HeartIcon } from "@/components/ui/icons";
-import type { DemoCat } from "@/features/cats/demo";
+import type { CatView } from "@/features/cats/types";
+import { toggleLikeAction } from "@/server/cats/actions";
 
 /**
- * การ์ดแมวในหน้า "หาคู่" พร้อมปุ่มหัวใจ (optimistic UI ฝั่ง client)
- * ตอนนี้สลับสถานะในหน่วยความจำเท่านั้น — การบันทึก favorites จริงเป็นงาน FAV-01
- * (ต้อง rollback เมื่อ server บันทึกไม่สำเร็จ)
+ * การ์ดแมวในหน้า "หาคู่" พร้อมปุ่มหัวใจ (optimistic UI + rollback)
+ * บันทึกการกดใจจริงผ่าน server action toggleLikeAction (ตาราง cat_likes)
  */
-export function DiscoverCard({ cat, seed }: { cat: DemoCat; seed: number }) {
+export function DiscoverCard({ cat, seed }: { cat: CatView; seed: number }) {
   const [liked, setLiked] = useState(Boolean(cat.liked));
+  const [pending, startTransition] = useTransition();
+
+  function onToggle() {
+    const next = !liked;
+    setLiked(next); // optimistic
+    startTransition(async () => {
+      const res = await toggleLikeAction(cat.id);
+      if (!res.ok) {
+        setLiked(!next); // rollback เมื่อ server ไม่สำเร็จ
+      } else {
+        setLiked(res.liked);
+      }
+    });
+  }
 
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition hover:shadow-md">
       <div className="relative">
-        <CatThumb seed={seed} rounded="rounded-none" className="aspect-square w-full" />
+        <CatThumb
+          seed={seed}
+          src={cat.photo}
+          alt={`รูปแมว ${cat.name}`}
+          rounded="rounded-none"
+          className="aspect-square w-full"
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+        />
         <button
           type="button"
-          onClick={() => setLiked((v) => !v)}
+          onClick={onToggle}
+          disabled={pending}
           aria-pressed={liked}
           aria-label={liked ? `เอา ${cat.name} ออกจากที่กดใจ` : `กดใจ ${cat.name}`}
-          className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-surface/90 shadow transition hover:scale-105"
+          className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-surface/90 shadow transition hover:scale-105 disabled:opacity-60"
         >
           <HeartIcon
             className={`h-5 w-5 ${liked ? "fill-pink-500 text-pink-500" : "text-muted"}`}

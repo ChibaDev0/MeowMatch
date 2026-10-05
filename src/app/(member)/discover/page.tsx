@@ -1,81 +1,113 @@
 import type { Metadata } from "next";
-import { ChevronDownIcon } from "@/components/ui/icons";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
+import { DiscoverFilterPanel } from "@/features/discovery/discover-filters";
 import { DiscoverCard } from "@/features/discovery/discover-card";
-import { DEMO_DISCOVER_CATS } from "@/features/cats/demo";
+import { getDiscoverBreeds, getDiscoverCats, type DiscoverFilters } from "@/server/cats/queries";
 
 export const metadata: Metadata = { title: "หาคู่" };
 
-function Select({ label, placeholder }: { label: string; placeholder: string }) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-sm font-medium text-ink">{label}</label>
-      <div className="relative">
-        <select
-          defaultValue=""
-          className="w-full appearance-none rounded-lg border border-line bg-surface py-2.5 pl-3 pr-9 text-sm text-ink outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-        >
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        </select>
-        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-      </div>
-    </div>
-  );
+/** รับค่าตัวกรองจาก searchParams (string | string[] | undefined → string | undefined) */
+function one(v: string | string[] | undefined): string | undefined {
+  const s = Array.isArray(v) ? v[0] : v;
+  return s && s.trim() !== "" ? s : undefined;
 }
 
-export default function DiscoverPage() {
-  const cats = DEMO_DISCOVER_CATS;
+/** สร้าง querystring สำหรับลิงก์แบ่งหน้า โดยคงตัวกรองเดิมไว้ */
+function pageHref(filters: DiscoverFilters, page: number): string {
+  const params = new URLSearchParams();
+  if (filters.breed) params.set("breed", filters.breed);
+  if (filters.eye) params.set("eye", filters.eye);
+  if (filters.coat) params.set("coat", filters.coat);
+  if (filters.ear) params.set("ear", filters.ear);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return qs ? `/discover?${qs}` : "/discover";
+}
+
+export default async function DiscoverPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const filters: DiscoverFilters = {
+    breed: one(sp.breed),
+    eye: one(sp.eye),
+    coat: one(sp.coat),
+    ear: one(sp.ear),
+  };
+  const page = Math.max(1, Number(one(sp.page)) || 1);
+
+  const [result, breeds] = await Promise.all([
+    getDiscoverCats({ filters, page }),
+    getDiscoverBreeds(),
+  ]);
+
+  const totalPages = Math.max(1, Math.ceil(result.total / result.pageSize));
+  const hasPrev = result.page > 1;
+  const hasNext = result.page < totalPages;
+  const rangeStart = result.total === 0 ? 0 : (result.page - 1) * result.pageSize + 1;
+  const rangeEnd = Math.min(result.page * result.pageSize, result.total);
 
   return (
     <div className="space-y-6">
       <PageHeader title="หาคู่" subtitle="ค้นหาแมวจากผู้ใช้คนอื่น ๆ" />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        {/* Filters (DISC-01 — ยังไม่ผูกกับการค้นหาจริง) */}
-        <aside className="h-fit space-y-4 rounded-2xl border border-line bg-surface p-5">
-          <h2 className="font-semibold text-ink">ตัวกรอง</h2>
-          <Select label="สายพันธุ์" placeholder="เลือกสายพันธุ์" />
-          <Select label="สีตา" placeholder="เลือกสีตา" />
-          <div className="space-y-1.5">
-            <span className="text-sm font-medium text-ink">ลักษณะขน</span>
-            <div className="flex flex-wrap gap-2">
-              {["ขนสั้น", "ขนยาว", "ไม่มีขน"].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className="rounded-lg border border-line px-3 py-1.5 text-sm text-muted transition hover:border-primary-400 hover:text-primary-700"
-                >
-                  {c}
-                </button>
+        <DiscoverFilterPanel breeds={breeds} initial={filters} />
+
+        <section className="space-y-4">
+          <p className="text-sm text-muted">
+            {result.total > 0
+              ? `พบ ${result.total} ตัว · แสดง ${rangeStart}–${rangeEnd}`
+              : "ไม่พบแมวที่ตรงกับตัวกรอง"}
+          </p>
+
+          {result.cats.length > 0 ? (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {result.cats.map((cat, i) => (
+                <DiscoverCard key={cat.id} cat={cat} seed={i} />
               ))}
             </div>
-          </div>
-          <Select label="สีของแมว" placeholder="เลือกสีขน" />
-          <Select label="หู" placeholder="เลือกหู" />
-          <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              className="flex-1 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-primary-800"
-            >
-              ค้นหา
-            </button>
-            <button
-              type="button"
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              ล้างตัวกรอง
-            </button>
-          </div>
-        </aside>
+          ) : (
+            <div className="grid place-items-center rounded-2xl border border-dashed border-line bg-surface p-10 text-center text-muted">
+              ลองปรับหรือล้างตัวกรองเพื่อดูแมวตัวอื่น ๆ
+            </div>
+          )}
 
-        {/* Results */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {cats.map((cat, i) => (
-            <DiscoverCard key={cat.id} cat={cat} seed={i + 3} />
-          ))}
-        </div>
+          {totalPages > 1 && (
+            <nav className="flex items-center justify-center gap-3 pt-2" aria-label="แบ่งหน้า">
+              {hasPrev ? (
+                <Link
+                  href={pageHref(filters, result.page - 1)}
+                  className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-primary-50"
+                >
+                  ก่อนหน้า
+                </Link>
+              ) : (
+                <span className="cursor-not-allowed rounded-lg border border-line px-4 py-2 text-sm font-medium text-muted opacity-50">
+                  ก่อนหน้า
+                </span>
+              )}
+              <span className="text-sm text-muted">
+                หน้า {result.page} / {totalPages}
+              </span>
+              {hasNext ? (
+                <Link
+                  href={pageHref(filters, result.page + 1)}
+                  className="rounded-lg border border-line px-4 py-2 text-sm font-medium text-ink transition hover:bg-primary-50"
+                >
+                  ถัดไป
+                </Link>
+              ) : (
+                <span className="cursor-not-allowed rounded-lg border border-line px-4 py-2 text-sm font-medium text-muted opacity-50">
+                  ถัดไป
+                </span>
+              )}
+            </nav>
+          )}
+        </section>
       </div>
     </div>
   );
