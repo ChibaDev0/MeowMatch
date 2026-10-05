@@ -4,11 +4,13 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { SelectableCat } from "@/components/ui/selectable-cat";
-import { GatedAnalysisNote } from "@/components/ui/gated-note";
 import { DiscoverCard } from "@/features/discovery/discover-card";
 import type { CatView } from "@/features/cats/types";
 import type { DesiredGoalData } from "@/features/goals/types";
+import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { saveDesiredGoalAction } from "@/server/goals/actions";
+import { analyzeTargetAction } from "@/server/analysis/target-actions";
+import { TargetResultView } from "./target-result";
 
 const STEPS = ["เลือกแมวของฉัน", "ตั้งเป้าหมายลูกแมว", "ผลการวิเคราะห์"];
 const COAT = ["ขนสั้น", "ขนยาว", "ไม่มีขน"];
@@ -76,9 +78,30 @@ export function DesiredPlanner({
   const [color, setColor] = useState(initialGoal?.targetColor ?? "");
   const [ear, setEar] = useState(initialGoal?.targetEarType ?? "");
 
-  const [showNote, setShowNote] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [demo, setDemo] = useState(false);
+  const [analyzing, startAnalyze] = useTransition();
+  const [result, setResult] = useState<TargetSearchResult | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  function onAnalyze() {
+    if (!source) return;
+    setAnalyzeError(null);
+    startAnalyze(async () => {
+      const res = await analyzeTargetAction(
+        source,
+        { coat: coat ?? "", eye, ear },
+        { demo },
+      );
+      if (res.ok) setResult(res.result);
+      else {
+        setResult(null);
+        setAnalyzeError(res.error);
+      }
+    });
+  }
 
   function onSave() {
     setError(null);
@@ -176,8 +199,9 @@ export function DesiredPlanner({
                   badge="✓"
                   onSelect={() => {
                     setSource((v) => (v === cat.id ? null : cat.id));
-                    setShowNote(false);
                     setSaved(false);
+                    setResult(null);
+                    setAnalyzeError(null);
                   }}
                 />
               ))}
@@ -248,6 +272,19 @@ export function DesiredPlanner({
             </p>
           )}
 
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={demo}
+              onChange={(e) => {
+                setDemo(e.target.checked);
+                setResult(null);
+              }}
+              className="h-4 w-4 rounded border-line accent-primary-600"
+            />
+            โหมดสาธิตคณิตศาสตร์ (ใช้ชุดกฎที่ยังไม่ผ่านการตรวจรับ — ไม่ใช่ผลจริง)
+          </label>
+
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
@@ -259,15 +296,21 @@ export function DesiredPlanner({
             </button>
             <button
               type="button"
-              disabled={source === null}
-              onClick={() => setShowNote(true)}
+              disabled={source === null || analyzing}
+              onClick={onAnalyze}
               className="flex-1 rounded-xl border border-primary-200 px-5 py-3 font-medium text-primary-700 transition hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              วิเคราะห์ผลลัพธ์
+              {analyzing ? "กำลังวิเคราะห์…" : "วิเคราะห์ผลลัพธ์"}
             </button>
           </div>
 
-          {showNote && <GatedAnalysisNote />}
+          {analyzeError && (
+            <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600" role="alert">
+              {analyzeError}
+            </p>
+          )}
+
+          {result && <TargetResultView result={result} />}
         </div>
       )}
     </div>

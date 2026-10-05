@@ -26,9 +26,9 @@ function cat(id: string, over: Partial<CatView> = {}): CatView {
   };
 }
 
-const MINE_A = cat("a", { coat: "ขนสั้น" });
-const MINE_B = cat("b", { coat: "ขนยาว" });
-const LIKED = cat("liked", { coat: "ขนยาว" });
+const MINE_A = cat("a", { coat: "ขนสั้น", sex: "female" });
+const MINE_B = cat("b", { coat: "ขนยาว", sex: "male" });
+const LIKED = cat("liked", { coat: "ขนยาว", sex: "male" });
 
 beforeEach(() => {
   vi.mocked(getMyCats).mockReset();
@@ -74,6 +74,14 @@ describe("analyzePairAction — ตรวจสิทธิ์/อินพุ�
 });
 
 describe("analyzePairAction — ส่งค่า demo ไปยัง engine ถูกต้อง", () => {
+  it("same-sex pair is blocked through the real action-to-engine path", async () => {
+    vi.mocked(getMyCats).mockResolvedValue([MINE_A, { ...MINE_B, sex: "female" }]);
+    const res = await analyzePairAction("a", "b", { demo: true });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.error);
+    expect(res.result.traits.every(t => t.status === "blocked")).toBe(true);
+    expect(res.result.coverage.complete).toBe(false);
+  });
   it("ค่าเริ่มต้น (ไม่เปิด demo) → coat_type เป็น unsupported (ไม่เติม %)", async () => {
     const res = await analyzePairAction("a", "b");
     expect(res.ok).toBe(true);

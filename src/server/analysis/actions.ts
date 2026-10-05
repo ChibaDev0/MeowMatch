@@ -1,12 +1,9 @@
 "use server";
 
-import { TRAIT_CATEGORIES } from "@/lib/validation/common";
-import type { TraitCategory } from "@/lib/validation/common";
 import type { PairAnalysisResult } from "@/domain/genetics/contracts/types";
-import type { AnalysisParent } from "@/domain/genetics/contracts/input";
 import { analyzePair } from "@/domain/genetics/pair/analyze";
 import { getLikedCats, getMyCats } from "@/server/cats/queries";
-import type { CatView } from "@/features/cats/types";
+import { ANALYZED_CATEGORIES, analysisCatIdSchema, analysisOptsSchema, catToParent } from "./map";
 
 /**
  * วิเคราะห์คู่ (PAIR-01) — ชั้น server เป็นผู้ "ตรวจสิทธิ์" ก่อนส่งให้ engine (07-genetics-engine §A)
@@ -19,31 +16,22 @@ export type PairAnalysisResponse =
   | { ok: true; result: PairAnalysisResult }
   | { ok: false; error: string };
 
-/** หมวดที่วิเคราะห์ในหน้า breeding (ตัด temperament ออก — ไม่คำนวณพันธุกรรมเป็นเปอร์เซ็นต์) */
-const ANALYZED_CATEGORIES: readonly TraitCategory[] = TRAIT_CATEGORIES.filter(
-  (c) => c !== "temperament",
-);
-
-/** map รูปลักษณ์ข้อความใน CatView → phenotype ต่อหมวดที่ engine รับ */
-function toParent(cat: CatView): AnalysisParent {
-  return {
-    catId: cat.id,
-    name: cat.name,
-    sex: cat.sex,
-    phenotype: {
-      coat_type: cat.coat,
-      eye_color: cat.eye,
-      ear_type: cat.ear,
-    },
-  };
-}
-
 export async function analyzePairAction(
   aId: string,
   bId: string,
   opts?: { demo?: boolean },
 ): Promise<PairAnalysisResponse> {
-  if (!aId || !bId) return { ok: false, error: "กรุณาเลือกแมวให้ครบสองตัว" };
+  // ตรวจ payload ตอน runtime ก่อน (P5-06)
+  const aParsed = analysisCatIdSchema.safeParse(aId);
+  const bParsed = analysisCatIdSchema.safeParse(bId);
+  if (!aParsed.success || !bParsed.success) {
+    return { ok: false, error: "กรุณาเลือกแมวให้ครบสองตัว" };
+  }
+  if (!analysisOptsSchema.safeParse(opts).success) {
+    return { ok: false, error: "ตัวเลือกไม่ถูกต้อง" };
+  }
+  aId = aParsed.data;
+  bId = bParsed.data;
   if (aId === bId) return { ok: false, error: "เลือกแมวตัวเดียวกันไม่ได้" };
 
   const [myCats, likedCats] = await Promise.all([getMyCats(), getLikedCats()]);
@@ -57,8 +45,8 @@ export async function analyzePairAction(
 
   const result = analyzePair({
     categories: ANALYZED_CATEGORIES,
-    a: toParent(a),
-    b: toParent(b),
+    a: catToParent(a),
+    b: catToParent(b),
     allowUnverifiedRulesets: opts?.demo ?? false,
   });
 

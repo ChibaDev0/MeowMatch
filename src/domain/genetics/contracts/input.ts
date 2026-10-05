@@ -34,3 +34,19 @@ export interface PairAnalysisInput {
    */
   allowUnverifiedRulesets?: boolean;
 }
+
+/** input ของการค้นหาคู่ตามเป้าหมาย (โหมด B — reverse search + constraint filtering + ranking) */
+export interface TargetAnalysisInput {
+  /** แมวตั้งต้น (ต้องเป็นของผู้ใช้ — ตรวจที่ชั้น server) */
+  source: AnalysisParent;
+  /**
+   * เป้าหมายลูกแมว: outcome code ที่ต้องการต่อหมวด (เช่น { coat_type: "long" })
+   * หมวดที่ไม่ได้ระบุ = "ไม่จำกัด" (ไม่สร้างเงื่อนไขเพิ่ม)
+   */
+  targets: Partial<Record<TraitCategory, string>>;
+  /** รายการแมวผู้สมัครที่ "เข้าถึง/ยินยอมแล้ว" (เช่น แมวที่กดใจไว้) */
+  candidates: readonly AnalysisParent[];
+  allowUnverifiedRulesets?: boolean;
+  /** คืนเฉพาะอันดับต้น ๆ (ค่าเริ่มต้น = ทั้งหมดที่ประเมินได้) */
+  topK?: number;
+}

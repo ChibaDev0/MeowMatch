@@ -12,6 +12,14 @@
 /** ความน่าจะเป็นใน [0,1] หรือ null เมื่อยังคำนวณไม่ได้ (ห้ามแทนด้วย 0) */
 export type Probability = number | null;
 
+/**
+ * ความเข้ากันด้านเพศของคู่ (P5-02) — แยก "ยืนยันแล้ว" ออกจาก "ยังไม่ทราบ" ชัดเจน
+ *  - confirmed    = ทราบเพศทั้งคู่และผสมกันได้ (คนละเพศ)
+ *  - unknown      = อย่างน้อยหนึ่งตัวไม่ทราบเพศ → ยังไม่ยืนยันว่าผสมกันได้
+ *  - incompatible = ทราบเพศทั้งคู่และเป็นเพศเดียวกัน → ผสมกันไม่ได้
+ */
+export type SexCompatibility = "confirmed" | "unknown" | "incompatible";
+
 /** สถานะของผลราย trait — แยกกรณี "ไม่รองรับ" ออกจาก "ความน่าจะเป็น 0" อย่างชัดเจน */
 export type TraitOutcomeStatus =
   | "computed" // คำนวณจาก genotype ที่ระบุครบ
@@ -63,6 +71,8 @@ export interface EngineVersions {
 export interface PairAnalysisResult {
   kind: "pair";
   traits: TraitResult[];
+  /** ความเข้ากันด้านเพศของคู่ (P5-02) — UI ต้องไม่แสดง unknown เหมือนยืนยันแล้ว */
+  sexCompatibility: SexCompatibility;
   /** คำเตือนระดับผลรวม เช่น welfare gate, ข้อจำกัดของโหมดสาธิต (07-genetics-engine §warnings) */
   warnings: string[];
   coverage: Coverage;
@@ -72,19 +82,30 @@ export interface PairAnalysisResult {
 /** ผู้สมัครในการค้นหาคู่ตามเป้าหมาย — ไม่รวมทุกอย่างเป็นคะแนนก้อนเดียว */
 export interface RankedCandidate {
   candidateCatId: string;
-  /** โอกาสลูกตรงเป้าหมายทั้งหมด (joint) — null เมื่อยังไม่มีโมเดลครบ */
+  /** ชื่อแมว (ไว้แสดงผล) */
+  candidateName: string;
+  /** โอกาสลูกตรงเป้าหมายทั้งหมด (joint) — null เมื่อยังไม่มีโมเดลครบหรือเป็นช่วง scenario */
   targetProbability: Probability;
   status: TraitOutcomeStatus;
+  /** ช่วงของเป้าหมายเดียวเมื่อ status = scenario_range; หลายลักษณะต้องมี joint model ก่อน */
+  lower?: number;
+  upper?: number;
   /** สัดส่วนความครบของหลักฐาน (ไม่ใช่ความแม่นยำของ engine) ใช้ tie-break */
   completeness: number;
+  /** ความเข้ากันด้านเพศกับแมวต้นทาง (P5-02) — unknown = ยังไม่ยืนยันว่าผสมได้ ไม่ใช่ผ่านเงื่อนไขแล้ว */
+  sexCompatibility: SexCompatibility;
 }
 
 export interface TargetSearchResult {
   kind: "target_search";
   candidates: RankedCandidate[];
+  /** หมวดเป้าหมายที่ยังไม่มี ruleset รองรับ → ทำให้ joint คำนวณครบไม่ได้ */
+  unsupportedTargets: string[];
   evaluatedCount: number;
   eligibleCount: number;
   searchComplete: boolean;
+  /** คำเตือนระดับผลรวม (เช่น โหมดสาธิต, เป้าหมายที่ยังไม่รองรับ) */
+  warnings: string[];
   coverage: Coverage;
   versions: EngineVersions;
 }

@@ -143,6 +143,37 @@ describe("analyzePair — scenario_range (genotype ไม่แน่นอน �
   });
 });
 
+describe("analyzePair — ความถูกต้องของหลักฐาน (audit ALG-02/03/04)", () => {
+  it("phenotype ขนยาว แต่ genotype L/L ขัดกัน → conflicting_evidence + coverage ไม่ครบ", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนยาว" }, genotype: { coat_type: ["L", "L"] } }),
+      b: parent({ genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).toBe("conflicting_evidence");
+    expect(res.coverage.complete).toBe(false);
+  });
+
+  it("allele นอกโมเดล (X/X) → ไม่ใช่ computed (insufficient_data)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ genotype: { coat_type: ["X", "X"] } }),
+      b: parent({ genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).not.toBe("computed");
+  });
+
+  it("เพศเดียวกันที่ทราบแน่ → ทุก trait ถูก blocked (hard constraint ร่วมกับ target)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "male", genotype: { coat_type: ["L", "l"] } }),
+      b: parent({ sex: "male", genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).toBe("blocked");
+    expect(res.warnings.some((w) => w.includes("เพศเดียวกัน"))).toBe(true);
+  });
+});
+
 describe("analyzePair — welfare gate", () => {
   it("หูพับ × หูพับ → ear_type ถูก blocked และมี warning", () => {
     const res = analyzePair({
@@ -159,10 +190,53 @@ describe("analyzePair — welfare gate", () => {
     const res = analyzePair({
       categories: ["ear_type"],
       allowUnverifiedRulesets: true,
-      a: parent({ phenotype: { ear_type: "หูพับ" } }),
-      b: parent({ phenotype: { ear_type: "หูตั้ง" } }),
+      a: parent({ sex: "female", phenotype: { ear_type: "หูพับ" } }),
+      b: parent({ sex: "male", phenotype: { ear_type: "หูตั้ง" } }),
     });
     expect(res.traits[0]!.status).toBe("unsupported");
-    expect(res.warnings).toHaveLength(1); // เฉพาะ warning โหมดสาธิต
+    expect(res.warnings.some((w) => w.includes("Fold"))).toBe(false); // ไม่โดน welfare block
+    expect(res.warnings).toHaveLength(1); // เฉพาะ warning โหมดสาธิต (เพศครบ จึงไม่มี warning เพศ)
+  });
+});
+
+describe("analyzePair — สถานะเพศ (P5-02)", () => {
+  it("เพศไม่ทราบอย่างน้อยหนึ่งตัว → sexCompatibility=unknown + warning (ไม่ block)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "unknown", phenotype: { coat_type: "ขนยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.sexCompatibility).toBe("unknown");
+    expect(res.traits[0]!.status).toBe("computed"); // ยังคำนวณได้ภายใต้สมมติฐาน
+    expect(res.warnings.some((w) => w.includes("เพศ"))).toBe(true);
+  });
+
+  it("เพศครบคนละเพศ → confirmed และไม่มี warning เพศ", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", phenotype: { coat_type: "ขนยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.sexCompatibility).toBe("confirmed");
+  });
+});
+
+describe("analyzePair — runtime validation (P5-06)", () => {
+  it("รูปลักษณ์กำกวม 'ไม่ทราบว่าขนสั้นหรือยาว' → insufficient_data (ไม่เดาข้างใดข้างหนึ่ง)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", phenotype: { coat_type: "ไม่ทราบว่าขนสั้นหรือยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("insufficient_data");
+  });
+
+  it("genotype ความยาวไม่ใช่สองอัลลีล → insufficient_data (ไม่ computed)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", genotype: { coat_type: ["l"] as unknown as [string, string] } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("insufficient_data");
   });
 });

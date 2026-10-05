@@ -15,13 +15,20 @@ import type { PhenotypeRuleset } from "./types";
 const SHORT = { code: "short", labelTh: "ขนสั้น" } as const;
 const LONG = { code: "long", labelTh: "ขนยาว" } as const;
 
-/** รูปลักษณ์ที่เจ้าของกรอก (ข้อความ) → ชุด genotype ที่สอดคล้อง */
+/**
+ * รูปลักษณ์ที่เจ้าของกรอก (ข้อความ) → ชุด genotype ที่สอดคล้อง
+ * ใช้ canonical label แบบตรงตัว (P5-06): ค่ากำกวม เช่น "ไม่ทราบว่าขนสั้นหรือยาว"
+ * (มีทั้ง "สั้น" และ "ยาว") ต้องคืน null เป็น insufficient_data ไม่เดาข้างใดข้างหนึ่ง
+ */
 function phenotypeToGenotypes(label: string | undefined): Genotype[] | null {
   if (!label) return null;
   const t = label.trim();
-  if (t.includes("ยาว")) return [["l", "l"]]; // ขนยาว = l/l แน่นอน
-  if (t.includes("สั้น")) return [["L", "L"], ["L", "l"]]; // ขนสั้น = L/L หรือพาหะ L/l
-  return null; // ไม่รู้จักค่า → ให้ engine คืน insufficient_data
+  const hasLong = t.includes("ยาว");
+  const hasShort = t.includes("สั้น");
+  if (hasLong && hasShort) return null; // กำกวม → ข้อมูลไม่พอ
+  if (t === "ขนยาว") return [["l", "l"]]; // ขนยาว = l/l แน่นอน
+  if (t === "ขนสั้น") return [["L", "L"], ["L", "l"]]; // ขนสั้น = L/L หรือพาหะ L/l
+  return null; // ไม่รู้จักค่า → insufficient_data
 }
 
 const LONG_KEY = genotypeKey(["l", "l"]);

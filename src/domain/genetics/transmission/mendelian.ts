@@ -62,9 +62,12 @@ export function parseGenotypeKey(key: string): Genotype {
  *    กรณี genotype พ่อแม่ไม่ทราบต้องรวมผ่าน joint posterior ไม่เอา marginal p มาแทนตรงๆ
  */
 export function atLeastOneInLitter(p: number, n: number): number {
-  if (p < 0 || p > 1) throw new RangeError("p ต้องอยู่ใน [0,1]");
-  if (!Number.isInteger(n) || n < 0) throw new RangeError("n ต้องเป็นจำนวนเต็ม ≥ 0");
-  return 1 - Math.pow(1 - p, n);
+  if (!Number.isFinite(p) || p < 0 || p > 1) throw new RangeError("p ต้องเป็นจำนวนจริงใน [0,1]");
+  if (!Number.isSafeInteger(n) || n < 0) throw new RangeError("n ต้องเป็นจำนวนเต็มที่แทนค่าได้แน่นอน ≥ 0");
+  if (n === 0) return 0;
+  // 1 − (1 − p)^n = −expm1(n · log1p(−p)) — ลด floating-point cancellation เมื่อ p เล็กมาก
+  // (เช่น p = 1e-20 ซึ่ง 1 − p ปัดเป็น 1 แล้วได้ 0 ผิด)
+  return -Math.expm1(n * Math.log1p(-p));
 }
 
 /**
@@ -74,9 +77,15 @@ export function atLeastOneInLitter(p: number, n: number): number {
  *   p = 0 → ไม่มีวันถึงเป้าหมาย (คืน null); p ≥ 1 → ถึงแล้วตั้งแต่ตัวแรก (คืน 1)
  */
 export function littersForTargetProbability(p: number, q: number): number | null {
+  if (!Number.isFinite(p) || p < 0 || p > 1) throw new RangeError("p ต้องเป็นจำนวนจริงใน [0,1]");
+  if (!Number.isFinite(q)) throw new RangeError("q ต้องเป็นจำนวนจริง");
   if (q <= 0) return 0;
   if (q >= 1) throw new RangeError("q ต้องน้อยกว่า 1 (ความแน่นอน 100% ไม่การันตีได้)");
-  if (p <= 0) return null;
-  if (p >= 1) return 1;
-  return Math.ceil(Math.log(1 - q) / Math.log(1 - p));
+  if (p <= 0) return null; // p = 0 ไม่มีวันถึงเป้าหมาย
+  if (p >= 1) return 1; // p = 1 ถึงตั้งแต่ตัวแรกตามสมมติฐาน
+  const count = Math.ceil(Math.log1p(-q) / Math.log1p(-p));
+  if (!Number.isSafeInteger(count)) {
+    throw new RangeError("จำนวนลูกเกินขอบเขตจำนวนเต็มที่ระบบแทนค่าได้แน่นอน");
+  }
+  return count;
 }
