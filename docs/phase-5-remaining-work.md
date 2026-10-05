@@ -21,6 +21,16 @@ P1 = ต้องปิดก่อนเปิดฟีเจอร์จริ
 
 หลักฐาน: `npm test` 176 ผ่าน (รวม audit gate), typecheck/lint/build ผ่าน เทสต์ใหม่อยู่ใน `fixtures/pair.golden.test.ts` (เพศ/validation), `fixtures/target.golden.test.ts` (unknown sex/topK), `server/analysis/target-actions.test.ts` (zod)
 
+## ความคืบหน้า increment 4 (5 ตุลาคม 2026) — P5-01 candidate pool
+
+เพิ่ม `getAnalysisCandidates(excludeCatId?)` ใน `server/cats/queries.ts`:
+- แบ่งหน้าแบบลำดับเสถียร (created_at desc, cat_id asc) + ใช้ `count` รู้ว่าครบหรือยัง + guard จำนวนหน้า
+- คืน `CandidatePool { cats, source: "real"|"demo", complete, error, fetched, expected }` — **error แยกจาก empty** และ **missing schema → demo ที่ติด `source:"demo"`** ไม่อ้างเป็นข้อมูลจริง
+- error กลางทาง → `complete=false` (ไม่รายงานว่าครบ); แมวที่ถูกซ่อน (RLS) หายได้โดยไม่ถือเป็น error
+- engine รับ `poolComplete` → ตั้ง `searchComplete=false` เมื่อ pool ไม่ครบ; server action คืน `pool` ให้ UI; หน้า desired-cats แสดง "ค้นจากแมวที่กดใจ N ตัว ไม่ใช่ทุกตัวในระบบ" + ป้าย demo/ดึงไม่ครบ
+
+หลักฐาน: `npm test` 185 ผ่าน, typecheck/lint/build ผ่าน เทสต์ครอบ 0 แถว, หลายหน้า, ล้มกลางหน้า (timeout), แมวถูกซ่อน, missing schema, exclude source (`server/cats/queries.test.ts`) และ provenance/`searchComplete` (`server/analysis/target-actions.test.ts`). **ยังเปิด:** ยืนยันบน DB จริง (ผูกกับ P5-05/P5-08) ยังไม่ได้ทำในชั้น unit/mock นี้
+
 ## ภาพรวมงานที่ยังเปิด
 
 | ID | งาน | ระดับ | สถานะหลักฐาน | เชื่อม backlog |
@@ -109,7 +119,7 @@ Bayesian Network/Variable Elimination, Dynamic Programming, Monte Carlo แล�
 
 ## Checklist ปิด Phase 5
 
-- [ ] P5-01 ข้อมูลครบ/ผิดพลาด/สาธิตแยกได้และมี tests
+- [~] P5-01 ข้อมูลครบ/ผิดพลาด/สาธิตแยกได้และมี tests (getAnalysisCandidates + provenance + searchComplete, ทดสอบระดับ mock แล้ว); **รอยืนยันบน DB จริง (P5-05/P5-08)**
 - [~] P5-02 decision table เพศรวมศูนย์แล้ว (classifySexCompatibility) pair/target ใช้ร่วมกัน + surface unknown; **รอ domain review ขอบเขต welfare/health ก่อนปิด**
 - [ ] P5-03 มีหลักฐานรับรองกฎทุก trait ที่ประกาศใช้จริง หรือจำกัด release เป็น demo ชัดเจน
 - [ ] P5-04 ผลทั้งสองโหมดมี history/idempotency/provenance/replay ที่ตรวจได้

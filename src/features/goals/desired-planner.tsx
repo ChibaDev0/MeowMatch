@@ -9,7 +9,7 @@ import type { CatView } from "@/features/cats/types";
 import type { DesiredGoalData } from "@/features/goals/types";
 import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { saveDesiredGoalAction } from "@/server/goals/actions";
-import { analyzeTargetAction } from "@/server/analysis/target-actions";
+import { analyzeTargetAction, type CandidatePoolInfo } from "@/server/analysis/target-actions";
 import { TargetResultView } from "./target-result";
 
 const STEPS = ["เลือกแมวของฉัน", "ตั้งเป้าหมายลูกแมว", "ผลการวิเคราะห์"];
@@ -84,6 +84,7 @@ export function DesiredPlanner({
   const [demo, setDemo] = useState(false);
   const [analyzing, startAnalyze] = useTransition();
   const [result, setResult] = useState<TargetSearchResult | null>(null);
+  const [pool, setPool] = useState<CandidatePoolInfo | undefined>(undefined);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   function onAnalyze() {
@@ -95,9 +96,12 @@ export function DesiredPlanner({
         { coat: coat ?? "", eye, ear },
         { demo },
       );
-      if (res.ok) setResult(res.result);
-      else {
+      if (res.ok) {
+        setResult(res.result);
+        setPool(res.pool);
+      } else {
         setResult(null);
+        setPool(undefined);
         setAnalyzeError(res.error);
       }
     });
@@ -201,6 +205,7 @@ export function DesiredPlanner({
                     setSource((v) => (v === cat.id ? null : cat.id));
                     setSaved(false);
                     setResult(null);
+                    setPool(undefined);
                     setAnalyzeError(null);
                   }}
                 />
@@ -279,6 +284,7 @@ export function DesiredPlanner({
               onChange={(e) => {
                 setDemo(e.target.checked);
                 setResult(null);
+                setPool(undefined);
               }}
               className="h-4 w-4 rounded border-line accent-primary-600"
             />
@@ -310,7 +316,7 @@ export function DesiredPlanner({
             </p>
           )}
 
-          {result && <TargetResultView result={result} />}
+          {result && <TargetResultView result={result} pool={pool} />}
         </div>
       )}
     </div>

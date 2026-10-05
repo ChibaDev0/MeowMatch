@@ -3,6 +3,7 @@ import type {
   TargetSearchResult,
   TraitOutcomeStatus,
 } from "@/domain/genetics/contracts/types";
+import type { CandidatePoolInfo } from "@/server/analysis/target-actions";
 
 /**
  * แสดงผลการค้นหาคู่ตามเป้าหมาย (TARGET-01) — จัดอันดับแบบแยกกลุ่มที่อธิบายได้
@@ -60,9 +61,22 @@ function CandidateRow({ cand, rank }: { cand: RankedCandidate; rank: number }) {
   );
 }
 
-export function TargetResultView({ result }: { result: TargetSearchResult }) {
+export function TargetResultView({
+  result,
+  pool,
+}: {
+  result: TargetSearchResult;
+  pool?: CandidatePoolInfo;
+}) {
   return (
     <div className="space-y-4">
+      <div className="rounded-xl border border-line bg-primary-50/50 p-3 text-xs text-muted">
+        ค้นจาก <span className="font-medium text-ink">แมวที่คุณกดใจไว้</span>{" "}
+        {pool ? `(${pool.fetched} ตัว)` : ""} เท่านั้น — ไม่ใช่แมวทุกตัวในระบบ
+        {pool?.source === "demo" && " · กำลังใช้ข้อมูลสาธิต (ยังไม่เชื่อมฐานข้อมูลจริง)"}
+        {pool && !pool.complete && " · ⚠️ ดึงรายชื่อได้ไม่ครบ ผลอาจไม่ครบถ้วน"}
+      </div>
+
       {result.warnings.length > 0 && (
         <div className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           {result.warnings.map((w, i) => (

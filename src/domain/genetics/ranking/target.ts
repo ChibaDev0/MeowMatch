@@ -234,6 +234,9 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
   if (targetCats.length === 0) {
     warnings.push("ยังไม่ได้ตั้งเป้าหมายลูกแมว — เลือกอย่างน้อยหนึ่งลักษณะเพื่อจัดอันดับ");
   }
+  if (input.poolComplete === false) {
+    warnings.push("ดึงชุดผู้สมัครได้ไม่ครบ — อันดับนี้มาจากเท่าที่ดึงได้ อาจมีคู่ที่ยังไม่ถูกประเมิน");
+  }
   if (unresolvedCount > 0) {
     warnings.push(`มีผู้สมัคร ${unresolvedCount} ตัวที่ยังคำนวณไม่ได้ครบ เพราะข้อมูลหรือโมเดลยังไม่พร้อม — ไม่ได้หมายถึงโอกาสเป็นศูนย์`);
   }
@@ -251,7 +254,8 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
     evaluatedCount: evaluated,
     eligibleCount: eligible,
     // ประเมินผู้สมัครครบทุกตัวในชุดที่ส่งมา (การตัด topK เป็นการตัด "การแสดงผล" ไม่ใช่การประเมิน)
-    searchComplete: true,
+    // แต่ถ้าชั้นดึงข้อมูลบอกว่า pool ไม่ครบ (P5-01) ต้องคืน false — สแกน array ครบไม่ได้แปลว่าดึง DB ครบ
+    searchComplete: input.poolComplete !== false,
     warnings,
     // ความครบของผลต้องรวมสถานะข้อมูลของผู้สมัครทุกตัวด้วย (ALG-06)
     // (หมวดที่ไม่รองรับไม่ใส่ใน omitted เพื่อไม่ให้ UI นับเป็นจำนวนแมวที่ถูกตัด)

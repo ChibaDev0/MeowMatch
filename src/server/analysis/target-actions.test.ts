@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { analyzeTargetAction } from "./target-actions";
-import { getLikedCats, getMyCats } from "@/server/cats/queries";
+import { getAnalysisCandidates, getMyCats, type CandidatePool } from "@/server/cats/queries";
 import type { CatView } from "@/features/cats/types";
 
 /**
  * TARGET-01 — ทดสอบชั้นตรวจสิทธิ์ของ server action (07-genetics-engine §B)
- * source=ของฉัน, candidate pool=แมวที่กดใจ (ตัด source ออก), ต้องตั้งเป้าหมายอย่างน้อยหนึ่ง
+ * source=ของฉัน, candidate pool=แมวที่กดใจ (ดึงผ่าน getAnalysisCandidates ที่ตัด source ออกแล้ว)
  */
 vi.mock("@/server/cats/queries", () => ({
   getMyCats: vi.fn(),
-  getLikedCats: vi.fn(),
+  getAnalysisCandidates: vi.fn(),
 }));
 
 function cat(id: string, over: Partial<CatView> = {}): CatView {
@@ -28,11 +28,22 @@ function cat(id: string, over: Partial<CatView> = {}): CatView {
 const SRC = cat("src", { sex: "female", coat: "ขนยาว" });
 const LIKED_MALE = cat("m", { sex: "male", coat: "ขนยาว" });
 
+function pool(over: Partial<CandidatePool> = {}): CandidatePool {
+  return {
+    cats: over.cats ?? [LIKED_MALE],
+    source: over.source ?? "real",
+    complete: over.complete ?? true,
+    error: over.error ?? null,
+    fetched: over.fetched ?? 1,
+    expected: over.expected ?? 1,
+  };
+}
+
 beforeEach(() => {
   vi.mocked(getMyCats).mockReset();
-  vi.mocked(getLikedCats).mockReset();
+  vi.mocked(getAnalysisCandidates).mockReset();
   vi.mocked(getMyCats).mockResolvedValue([SRC]);
-  vi.mocked(getLikedCats).mockResolvedValue([LIKED_MALE]);
+  vi.mocked(getAnalysisCandidates).mockResolvedValue(pool());
 });
 
 describe("analyzeTargetAction — runtime validation (P5-06)", () => {
@@ -93,12 +104,34 @@ describe("analyzeTargetAction — ตรวจสิทธิ์/อินพุ
     }
   });
 
-  it("source อยู่ใน likedCats ด้วย → ไม่ถูกจับเป็น candidate ของตัวเอง", async () => {
-    vi.mocked(getLikedCats).mockResolvedValue([SRC, LIKED_MALE]);
+  it("ส่ง excludeCatId = source ให้ชั้น query (กัน candidate เป็นตัวเอง)", async () => {
+    await analyzeTargetAction("src", { coat: "ขนยาว" }, { demo: true });
+    expect(vi.mocked(getAnalysisCandidates)).toHaveBeenCalledWith("src");
+  });
+});
+
+describe("analyzeTargetAction — provenance ของ pool (P5-01)", () => {
+  it("คืน pool info (source/complete/fetched) ให้ UI", async () => {
+    vi.mocked(getAnalysisCandidates).mockResolvedValue(
+      pool({ source: "demo", fetched: 3, expected: 3 }),
+    );
     const res = await analyzeTargetAction("src", { coat: "ขนยาว" }, { demo: true });
     expect(res.ok).toBe(true);
     if (res.ok) {
-      expect(res.result.candidates.every((c) => c.candidateCatId !== "src")).toBe(true);
+      expect(res.pool.source).toBe("demo");
+      expect(res.pool.fetched).toBe(3);
+    }
+  });
+
+  it("pool ดึงไม่ครบ → searchComplete=false และ pool.complete=false", async () => {
+    vi.mocked(getAnalysisCandidates).mockResolvedValue(
+      pool({ complete: false, error: "ดึงไม่ครบ" }),
+    );
+    const res = await analyzeTargetAction("src", { coat: "ขนยาว" }, { demo: true });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.result.searchComplete).toBe(false);
+      expect(res.pool.complete).toBe(false);
     }
   });
 });

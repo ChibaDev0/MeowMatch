@@ -3,7 +3,7 @@
 import type { TraitCategory } from "@/lib/validation/common";
 import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { analyzeTarget } from "@/domain/genetics/ranking/target";
-import { getLikedCats, getMyCats } from "@/server/cats/queries";
+import { getAnalysisCandidates, getMyCats, type CandidateSource } from "@/server/cats/queries";
 import {
   analysisCatIdSchema,
   analysisOptsSchema,
@@ -26,8 +26,17 @@ export type TargetLabels = {
   ear?: string;
 };
 
+/** provenance ของชุดผู้สมัคร (P5-01) — ให้ UI แยก real/demo และบอกว่าดึงไม่ครบ */
+export type CandidatePoolInfo = {
+  source: CandidateSource;
+  complete: boolean;
+  error: string | null;
+  fetched: number;
+  expected: number | null;
+};
+
 export type TargetAnalysisResponse =
-  | { ok: true; result: TargetSearchResult }
+  | { ok: true; result: TargetSearchResult; pool: CandidatePoolInfo }
   | { ok: false; error: string };
 
 function buildTargets(labels: TargetLabels): Partial<Record<TraitCategory, string>> {
@@ -58,19 +67,31 @@ export async function analyzeTargetAction(
     return { ok: false, error: "กรุณาตั้งเป้าหมายลูกแมวอย่างน้อยหนึ่งลักษณะ" };
   }
 
-  const [myCats, likedCats] = await Promise.all([getMyCats(), getLikedCats()]);
+  const [myCats, pool] = await Promise.all([
+    getMyCats(),
+    getAnalysisCandidates(sourceId),
+  ]);
 
   const source = myCats.find((c) => c.id === sourceId);
   if (!source) return { ok: false, error: "แมวต้นทางต้องเป็นแมวของคุณ" };
 
-  const candidates = likedCats.filter((c) => c.id !== sourceId).map(catToParent);
-
   const result = analyzeTarget({
     source: catToParent(source),
     targets,
-    candidates,
+    candidates: pool.cats.map(catToParent),
     allowUnverifiedRulesets: opts?.demo ?? false,
+    poolComplete: pool.complete,
   });
 
-  return { ok: true, result };
+  return {
+    ok: true,
+    result,
+    pool: {
+      source: pool.source,
+      complete: pool.complete,
+      error: pool.error,
+      fetched: pool.fetched,
+      expected: pool.expected,
+    },
+  };
 }

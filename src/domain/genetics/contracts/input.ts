@@ -49,4 +49,10 @@ export interface TargetAnalysisInput {
   allowUnverifiedRulesets?: boolean;
   /** คืนเฉพาะอันดับต้น ๆ (ค่าเริ่มต้น = ทั้งหมดที่ประเมินได้) */
   topK?: number;
+  /**
+   * ชั้นที่ดึงข้อมูลยืนยันว่า "ดึงชุดผู้สมัครครบจากแหล่งแล้ว" หรือไม่ (P5-01)
+   * false → engine ต้องคืน searchComplete=false ถึงจะประเมินทุกตัวที่ได้รับก็ตาม
+   * ค่าเริ่มต้น true (ถือว่า caller ส่งครบ)
+   */
+  poolComplete?: boolean;
 }
