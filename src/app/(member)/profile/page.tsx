@@ -4,20 +4,25 @@ import { EditIcon } from "@/components/ui/icons";
 import { ProfileTabs } from "@/features/profile/profile-tabs";
 import { LogoutButton } from "@/features/auth/logout-button";
 import { getProfile } from "@/server/auth/session";
+import { getLikedCats, getMyCats, getProfileStats } from "@/server/cats/queries";
 
 export const metadata: Metadata = { title: "โปรไฟล์" };
 
-/** ตัวเลขสถิติเป็น DEMO — เชื่อมข้อมูลจริงในงาน PRO-01 */
-const STATS = [
-  { label: "แมวของฉัน", value: 3 },
-  { label: "แมวที่กดใจ", value: 12 },
-  { label: "การผสมพันธุ์", value: 5 },
-];
-
 export default async function ProfilePage() {
-  const profile = await getProfile();
+  const [profile, stats, myCats, likedCats] = await Promise.all([
+    getProfile(),
+    getProfileStats(),
+    getMyCats(),
+    getLikedCats(),
+  ]);
   const displayName = profile?.display_name ?? "สมาชิก MeowMatch";
   const username = profile?.username ?? "meowmatch_user";
+
+  const STATS = [
+    { label: "แมวของฉัน", value: stats.myCats },
+    { label: "แมวที่กดใจ", value: stats.liked },
+    { label: "การผสมพันธุ์", value: stats.breeding },
+  ];
 
   return (
     <div className="space-y-6">
@@ -59,7 +64,7 @@ export default async function ProfilePage() {
 
         <hr className="border-line" />
 
-        <ProfileTabs />
+        <ProfileTabs myCats={myCats} likedCats={likedCats} />
       </div>
     </div>
   );

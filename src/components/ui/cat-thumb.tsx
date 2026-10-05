@@ -1,8 +1,10 @@
+import Image from "next/image";
 import { CatMarkIcon } from "./logo";
 
 /**
- * ภาพแมวชั่วคราว (placeholder) — ใช้ gradient + ไอคอนแมว แทนรูปจริง
- * ไม่ใช้รูปปลอม; เมื่อมีระบบอัปโหลด (MEDIA-01) จะแทนด้วย <Image> จาก Supabase Storage
+ * ภาพแมวในการ์ด — ถ้ามี `src` จะแสดงรูปจริง (ตอนนี้ใช้รูปตัวอย่างใน public/)
+ * ถ้าไม่มีรูป จะ fallback เป็น placeholder (gradient + ไอคอนแมว) ตามเดิม
+ * เมื่อมีระบบอัปโหลด (MEDIA-01) จะส่ง src เป็น URL จาก Supabase Storage
  */
 const GRADIENTS = [
   "from-amber-100 to-orange-200 text-orange-400",
@@ -16,11 +18,25 @@ export function CatThumb({
   seed = 0,
   className = "",
   rounded = "rounded-xl",
+  src,
+  alt = "",
+  sizes = "(max-width: 768px) 50vw, 33vw",
 }: {
   seed?: number;
   className?: string;
   rounded?: string;
+  src?: string;
+  alt?: string;
+  sizes?: string;
 }) {
+  if (src) {
+    return (
+      <div className={`relative overflow-hidden bg-slate-100 ${rounded} ${className}`}>
+        <Image src={src} alt={alt} fill sizes={sizes} className="object-cover" />
+      </div>
+    );
+  }
+
   const g = GRADIENTS[Math.abs(seed) % GRADIENTS.length];
   return (
     <div

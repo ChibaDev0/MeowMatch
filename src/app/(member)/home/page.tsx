@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRightIcon,
@@ -9,7 +10,7 @@ import {
   TargetIcon,
 } from "@/components/ui/icons";
 import { CatCard } from "@/components/ui/cat-card";
-import { DEMO_MY_CATS } from "@/features/cats/demo";
+import { getMyCats } from "@/server/cats/queries";
 
 export const metadata: Metadata = { title: "หน้าหลัก" };
 
@@ -20,13 +21,14 @@ const ACTIONS = [
   { href: "/discover", label: "หาคู่", desc: "ค้นหาแมวจากผู้ใช้คนอื่น", icon: SearchIcon, tile: "bg-accent-indigo text-accent-indigo-fg" },
 ];
 
-export default function HomePage() {
-  const cats = DEMO_MY_CATS;
+export default async function HomePage() {
+  const allCats = await getMyCats();
+  const cats = allCats.slice(0, 3);
 
   return (
     <div className="space-y-8">
       {/* Hero */}
-      <section className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-primary-50 to-primary-100 p-6 md:p-8">
+      <section className="relative flex items-center gap-6 overflow-hidden rounded-2xl bg-gradient-to-r from-primary-50 to-primary-100 p-6 md:p-8">
         <div className="relative z-10 max-w-lg space-y-2">
           <p className="text-sm font-medium text-primary-700">ยินดีต้อนรับสู่</p>
           <h1 className="text-3xl font-bold">
@@ -37,7 +39,17 @@ export default function HomePage() {
             หาคู่แมว วิเคราะห์สายพันธุ์ สร้างลูกแมวในแบบที่คุณต้องการ
           </p>
         </div>
-        <PawIcon className="absolute -right-2 top-6 hidden h-24 w-24 text-primary-200 sm:block" />
+        <div className="relative ml-auto hidden h-36 w-32 shrink-0 self-end sm:block md:h-44 md:w-40">
+          <Image
+            src="/home-welcome.png"
+            alt="แมวต้อนรับสู่ MeowMatch"
+            fill
+            priority
+            sizes="(min-width: 768px) 160px, 128px"
+            className="object-contain object-bottom drop-shadow"
+          />
+        </div>
+        <PawIcon className="pointer-events-none absolute right-40 top-6 hidden h-24 w-24 text-primary-200/70 lg:block" />
       </section>
 
       {/* Quick actions */}
@@ -63,7 +75,7 @@ export default function HomePage() {
           <h2 className="text-lg font-semibold">
             แมวของฉัน{" "}
             <span className="text-sm font-normal text-muted">
-              (ทั้งหมด {cats.length} ตัว)
+              (ทั้งหมด {allCats.length} ตัว)
             </span>
           </h2>
           <Link

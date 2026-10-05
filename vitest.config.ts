@@ -19,6 +19,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // server-only throw เมื่อถูก import นอก RSC — ระหว่างเทสต์ alias เป็นโมดูลว่าง
+      "server-only": fileURLToPath(new URL("./src/test/server-only-stub.ts", import.meta.url)),
     },
   },
 });

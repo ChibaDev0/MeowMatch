@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { CatIcon, HeartIcon, TargetIcon } from "@/components/ui/icons";
 import { LoginForm } from "@/features/auth/login-form";
@@ -17,8 +18,8 @@ export default async function LoginPage() {
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
-      {/* Hero */}
-      <section className="relative hidden flex-col justify-end overflow-hidden bg-gradient-to-br from-primary-100 via-primary-50 to-white p-12 lg:flex">
+      {/* Hero — ข้อความด้านบน + รูปลูกแมว (พื้นโปร่งใส) ตกแต่งด้านล่าง กลืนพื้น gradient */}
+      <section className="relative hidden flex-col overflow-hidden bg-gradient-to-br from-primary-100 via-primary-50 to-white p-12 lg:flex">
         <div className="space-y-5">
           <h1 className="text-5xl font-extrabold leading-tight">
             <span className="text-primary-900">Meow</span>
@@ -43,6 +44,18 @@ export default async function LoginPage() {
               </li>
             ))}
           </ul>
+        </div>
+
+        <div className="mt-auto flex justify-center pt-8">
+          <Image
+            src="/login-kittens.png"
+            alt="ลูกแมวสองตัวนอนเคียงกัน"
+            width={1100}
+            height={633}
+            priority
+            sizes="(min-width: 1024px) 40vw, 90vw"
+            className="h-auto w-full max-w-xl object-contain drop-shadow-xl"
+          />
         </div>
       </section>
 

@@ -15,6 +15,55 @@ export type Json =
 
 export type OnboardingStatus = "needs_username" | "complete";
 
+export type CatSexDb = "male" | "female" | "unknown";
+
+export type CatRow = {
+  id: string;
+  owner_id: string | null;
+  name: string;
+  breed: string | null;
+  sex: CatSexDb;
+  age_months: number | null;
+  coat: string | null;
+  eye_color: string | null;
+  ear_type: string | null;
+  temperament: string | null;
+  photo_path: string | null;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CatLikeRow = {
+  user_id: string;
+  cat_id: string;
+  created_at: string;
+};
+
+export type BreedingAnalysisRow = {
+  id: string;
+  owner_id: string;
+  parent_a_id: string;
+  parent_b_id: string;
+  result: Json | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type DesiredGoalRow = {
+  id: string;
+  owner_id: string;
+  source_cat_id: string | null;
+  target_breed: string | null;
+  target_eye_color: string | null;
+  target_coat: string | null;
+  target_color: string | null;
+  target_ear_type: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // NOTE: ใช้ `type` (ไม่ใช่ `interface`) เพื่อให้ assignable กับ Record<string, unknown>
 // ที่ supabase-js ต้องการ มิฉะนั้น schema จะ fallback เป็น never
 export type ProfileRow = {
@@ -49,6 +98,95 @@ export type Database = {
           avatar_path?: string | null;
           bio?: string | null;
           onboarding_status?: OnboardingStatus;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      cats: {
+        Row: CatRow;
+        Insert: {
+          id?: string;
+          owner_id?: string | null;
+          name: string;
+          breed?: string | null;
+          sex?: CatSexDb;
+          age_months?: number | null;
+          coat?: string | null;
+          eye_color?: string | null;
+          ear_type?: string | null;
+          temperament?: string | null;
+          photo_path?: string | null;
+          is_public?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          name?: string;
+          breed?: string | null;
+          sex?: CatSexDb;
+          age_months?: number | null;
+          coat?: string | null;
+          eye_color?: string | null;
+          ear_type?: string | null;
+          temperament?: string | null;
+          photo_path?: string | null;
+          is_public?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      cat_likes: {
+        Row: CatLikeRow;
+        Insert: {
+          user_id: string;
+          cat_id: string;
+          created_at?: string;
+        };
+        Update: {
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      breeding_analyses: {
+        Row: BreedingAnalysisRow;
+        Insert: {
+          id?: string;
+          owner_id: string;
+          parent_a_id: string;
+          parent_b_id: string;
+          result?: Json | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          result?: Json | null;
+          note?: string | null;
+        };
+        Relationships: [];
+      };
+      desired_goals: {
+        Row: DesiredGoalRow;
+        Insert: {
+          id?: string;
+          owner_id: string;
+          source_cat_id?: string | null;
+          target_breed?: string | null;
+          target_eye_color?: string | null;
+          target_coat?: string | null;
+          target_color?: string | null;
+          target_ear_type?: string | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          source_cat_id?: string | null;
+          target_breed?: string | null;
+          target_eye_color?: string | null;
+          target_coat?: string | null;
+          target_color?: string | null;
+          target_ear_type?: string | null;
+          note?: string | null;
           updated_at?: string;
         };
         Relationships: [];
