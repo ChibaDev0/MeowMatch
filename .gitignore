@@ -13,6 +13,10 @@ next-env.d.ts
 
 # testing
 /coverage
+/test-results
+/playwright-report
+# Playwright storage state มี session token ของผู้ใช้ทดสอบ — ห้าม commit
+tests/e2e/.auth/
 /playwright-report
 /test-results
 /.playwright

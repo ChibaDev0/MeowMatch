@@ -1,0 +1,43 @@
+{
+  "measuredAt": "2026-10-12T17:58:09.496Z",
+  "node": "v24.14.0",
+  "platform": "win32",
+  "scope": "Synthetic math fixtures only; includes validation and assertions; not a production SLA or biological validation",
+  "runs": [
+    {
+      "name": "exact-chain-8",
+      "iterations": 20,
+      "p50Ms": 0.329400000000021,
+      "p95Ms": 0.6249000000000251,
+      "maxMs": 1.3605000000000018
+    },
+    {
+      "name": "exact-chain-32",
+      "iterations": 20,
+      "p50Ms": 1.4062000000000126,
+      "p95Ms": 2.2321000000000026,
+      "maxMs": 2.275099999999952
+    },
+    {
+      "name": "exact-chain-128",
+      "iterations": 20,
+      "p50Ms": 21.037799999999947,
+      "p95Ms": 24.26260000000002,
+      "maxMs": 27.03290000000004
+    },
+    {
+      "name": "budget-triggered-sampling-10000",
+      "iterations": 10,
+      "p50Ms": 69.60239999999999,
+      "p95Ms": 79.6887999999999,
+      "maxMs": 79.6887999999999
+    },
+    {
+      "name": "dp-two-steps-32-states-4-actions",
+      "iterations": 20,
+      "p50Ms": 0.7392999999999574,
+      "p95Ms": 1.2945999999999458,
+      "maxMs": 1.6433999999999287
+    }
+  ]
+}
