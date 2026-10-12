@@ -10,7 +10,9 @@ import type { DesiredGoalData } from "@/features/goals/types";
 import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { saveDesiredGoalAction } from "@/server/goals/actions";
 import { analyzeTargetAction, type CandidatePoolInfo } from "@/server/analysis/target-actions";
+import type { MateSpecResult } from "@/domain/genetics/ranking/mate-spec";
 import { TargetResultView } from "./target-result";
+import { MateSpecView } from "./mate-spec-view";
 
 const STEPS = ["เลือกแมวของฉัน", "ตั้งเป้าหมายลูกแมว", "ผลการวิเคราะห์"];
 const COAT = ["ขนสั้น", "ขนยาว", "ไม่มีขน"];
@@ -85,6 +87,7 @@ export function DesiredPlanner({
   const [analyzing, startAnalyze] = useTransition();
   const [result, setResult] = useState<TargetSearchResult | null>(null);
   const [pool, setPool] = useState<CandidatePoolInfo | undefined>(undefined);
+  const [mateSpec, setMateSpec] = useState<MateSpecResult | undefined>(undefined);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   function onAnalyze() {
@@ -99,9 +102,11 @@ export function DesiredPlanner({
       if (res.ok) {
         setResult(res.result);
         setPool(res.pool);
+        setMateSpec(res.mateSpec);
       } else {
         setResult(null);
         setPool(undefined);
+        setMateSpec(undefined);
         setAnalyzeError(res.error);
       }
     });
@@ -206,6 +211,7 @@ export function DesiredPlanner({
                     setSaved(false);
                     setResult(null);
                     setPool(undefined);
+                    setMateSpec(undefined);
                     setAnalyzeError(null);
                   }}
                 />
@@ -285,6 +291,7 @@ export function DesiredPlanner({
                 setDemo(e.target.checked);
                 setResult(null);
                 setPool(undefined);
+                setMateSpec(undefined);
               }}
               className="h-4 w-4 rounded border-line accent-primary-600"
             />
@@ -316,6 +323,7 @@ export function DesiredPlanner({
             </p>
           )}
 
+          {mateSpec && <MateSpecView spec={mateSpec} />}
           {result && <TargetResultView result={result} pool={pool} />}
         </div>
       )}

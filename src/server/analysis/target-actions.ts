@@ -3,6 +3,7 @@
 import type { TraitCategory } from "@/lib/validation/common";
 import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { analyzeTarget } from "@/domain/genetics/ranking/target";
+import { requiredMateProfile, type MateSpecResult } from "@/domain/genetics/ranking/mate-spec";
 import type { TargetAnalysisInput } from "@/domain/genetics/contracts/input";
 import { withHistory, type HistoryReceipt } from "./history";
 import { z } from "zod";
@@ -39,7 +40,14 @@ export type CandidatePoolInfo = {
 };
 
 export type TargetAnalysisResponse =
-  | { ok: true; result: TargetSearchResult; pool: CandidatePoolInfo; history?: HistoryReceipt }
+  | {
+      ok: true;
+      result: TargetSearchResult;
+      pool: CandidatePoolInfo;
+      /** สเปกคู่ผสมที่ต้องใช้ (เฉพาะ coat_type ที่มี ruleset) — ไม่มีเมื่อไม่ได้ตั้งเป้าหมายขน */
+      mateSpec?: MateSpecResult;
+      history?: HistoryReceipt;
+    }
   | { ok: false; error: string };
 
 function buildTargets(labels: TargetLabels): Partial<Record<TraitCategory, string>> {
@@ -81,14 +89,26 @@ export async function analyzeTargetAction(
         if (!source)
           return { response: { ok: false, error: "แมวต้นทางต้องเป็นแมวของคุณ" }, real: false };
 
+        const sourceParent = catToParent(source);
         const input: TargetAnalysisInput = {
-          source: catToParent(source),
+          source: sourceParent,
           targets,
           candidates: pool.cats.map(catToParent),
           allowUnverifiedRulesets: opts?.demo ?? false,
           poolComplete: pool.complete,
         };
         const result = analyzeTarget(input);
+
+        // สเปกคู่ผสมที่ต้องใช้ (reverse spec) — ทำเฉพาะ coat_type ที่มี ruleset
+        // หมวดอื่นยัง unsupported (รอ RES-01) จึงไม่คำนวณ
+        const mateSpec = targets.coat_type
+          ? requiredMateProfile({
+              source: sourceParent,
+              category: "coat_type",
+              targetCode: targets.coat_type,
+              allowUnverifiedRulesets: opts?.demo ?? false,
+            })
+          : undefined;
 
         return {
           snapshot: { kind: "target_search", input },
@@ -98,6 +118,7 @@ export async function analyzeTargetAction(
           response: {
             ok: true,
             result,
+            mateSpec,
             pool: {
               source: pool.source,
               complete: pool.complete,
