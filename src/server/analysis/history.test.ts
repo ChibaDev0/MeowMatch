@@ -17,7 +17,8 @@ import {
   type Run,
   type Snapshot,
 } from "./history";
-import artifact from "./artifacts/engine-0.1.1.json";
+import artifact from "./artifacts/engine-0.2.0.json";
+import previousArtifact from "./artifacts/engine-0.1.1.json";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getUser } from "@/server/auth/session";
 import { analyzePairAction } from "./actions";
@@ -168,6 +169,8 @@ describe("canonical identity and immutable replay", () => {
     const d = draft();
     const envelope = makeEnvelope(d.snapshot, d.response);
     expect(() => replayEnvelope({ ...envelope, artifactHash: "old" })).toThrow("เวอร์ชันเดิม");
+    expect(hash(previousArtifact)).not.toBe(hash(artifact));
+    expect(() => replayEnvelope({ ...envelope, artifactHash: hash(previousArtifact) })).toThrow("เวอร์ชันเดิม");
     expect(() => replayEnvelope({ ...envelope, inputHash: "wrong" })).toThrow("ลายนิ้วมือ");
     envelope.response.result.warnings.push("changed");
     expect(() => replayEnvelope(envelope)).toThrow("ไม่ตรง");

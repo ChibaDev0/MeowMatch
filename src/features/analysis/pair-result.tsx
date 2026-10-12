@@ -28,7 +28,7 @@ const STATUS_META: Record<TraitOutcomeStatus, { label: string; cls: string }> = 
   insufficient_data: { label: "ข้อมูลไม่พอ", cls: "bg-slate-100 text-slate-700" },
   unsupported: { label: "ยังไม่รองรับ", cls: "bg-slate-100 text-slate-700" },
   conflicting_evidence: { label: "หลักฐานขัดกัน", cls: "bg-red-100 text-red-800" },
-  blocked: { label: "ระงับ (สวัสดิภาพ)", cls: "bg-red-100 text-red-800" },
+  blocked: { label: "ระงับคำแนะนำ", cls: "bg-red-100 text-red-800" },
   budget_exceeded: { label: "เกิน budget", cls: "bg-amber-100 text-amber-900" },
 };
 

@@ -81,7 +81,7 @@ export function DesiredPlanner({
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [demo, setDemo] = useState(false);
+  const [demo, setDemo] = useState(true); // รุ่น demo: เปิด algorithm เป็นค่าเริ่มต้นให้กดแล้วเห็นผล + อ้างอิง
   const [analyzing, startAnalyze] = useTransition();
   const [result, setResult] = useState<TargetSearchResult | null>(null);
   const [pool, setPool] = useState<CandidatePoolInfo | undefined>(undefined);

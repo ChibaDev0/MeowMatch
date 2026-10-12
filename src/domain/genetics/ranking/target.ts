@@ -19,8 +19,8 @@ import type {
 } from "../contracts/types";
 import type { AnalysisParent, TargetAnalysisInput } from "../contracts/input";
 import { RULESET_REGISTRY_VERSION, resolveRuleset } from "../rules/registry";
-import { checkPairWelfare } from "../constraints/welfare";
-import { classifySexCompatibility, pairSexIncompatible } from "../constraints/biology";
+import { assessPairEligibility, HEALTH_LIMITATION, MODEL_LIMITATION } from "../constraints/eligibility";
+import { classifySexCompatibility } from "../constraints/biology";
 import { analyzePair, ENGINE_VERSION } from "../pair/analyze";
 
 type CandidateEval = RankedCandidate;
@@ -169,43 +169,32 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
   const jointUnsupported = modelled.size > 1;
 
   const omitted: string[] = [];
+  const blockingWarnings = new Set<string>();
   const ranked: CandidateEval[] = [];
+  const pending: CandidateEval[] = [];
   let evaluated = 0;
   let eligible = 0;
 
   for (const cand of input.candidates) {
-    // --- hard constraints (คะแนนสูงมาชดเชยไม่ได้) ---
-    if (cand.catId === input.source.catId) {
-      omitted.push(`${cand.catId}: same_as_source`);
+    const eligibility = assessPairEligibility(input.source, cand);
+    if (eligibility.status === "blocked") {
+      omitted.push(cand.catId + ": " + eligibility.reasons.map((r) => r.code).join(", "));
+      eligibility.reasons.forEach((r) => blockingWarnings.add(r.reason));
       continue;
     }
-    if (checkPairWelfare(input.source, cand).length > 0) {
-      omitted.push(`${cand.catId}: welfare_blocked`);
-      continue;
+    const evaluation = evaluateCandidate(input.source, cand, targetCats, modelled, jointUnsupported, input.targets, allowUnverified);
+    if (eligibility.status === "conditional") {
+      pending.push(evaluation);
+    } else {
+      eligible++;
+      ranked.push(evaluation);
     }
-    if (pairSexIncompatible(input.source, cand)) {
-      omitted.push(`${cand.catId}: same_sex`);
-      continue;
-    }
-
-    eligible++;
-    ranked.push(
-      evaluateCandidate(
-        input.source,
-        cand,
-        targetCats,
-        modelled,
-        jointUnsupported,
-        input.targets,
-        allowUnverified,
-      ),
-    );
     evaluated++;
   }
 
   ranked.sort(compareCandidates);
   // ประเมินความครบจากทั้ง pool ก่อนตัดการแสดงผลด้วย topK
-  const unresolvedCount = ranked.filter(
+  const unresolvedCount = [...ranked, ...pending].filter(
     (c) => c.status !== "computed" && c.status !== "scenario_range",
   ).length;
   // topK ต้องเป็นจำนวนเต็มไม่ติดลบที่แทนค่าได้แน่นอน (P5-06); ค่าไม่ถูกต้อง → แสดงทั้งหมด
@@ -215,7 +204,7 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
       : ranked.length;
   const candidates = ranked.slice(0, topK);
 
-  const warnings: string[] = [];
+  const warnings: string[] = [MODEL_LIMITATION, HEALTH_LIMITATION, ...blockingWarnings];
   if (allowUnverified) {
     warnings.push(
       "เปิดโหมดสาธิตคณิตศาสตร์ (ชุดกฎที่ยังไม่ผ่านการตรวจรับ) — ตัวเลขเป็นตัวอย่างการคำนวณ ไม่ใช่ผลจริง",
@@ -240,16 +229,17 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
   if (unresolvedCount > 0) {
     warnings.push(`มีผู้สมัคร ${unresolvedCount} ตัวที่ยังคำนวณไม่ได้ครบ เพราะข้อมูลหรือโมเดลยังไม่พร้อม — ไม่ได้หมายถึงโอกาสเป็นศูนย์`);
   }
-  const unknownSexCount = ranked.filter((c) => c.sexCompatibility === "unknown").length;
+  const unknownSexCount = pending.length;
   if (unknownSexCount > 0) {
     warnings.push(
-      `มีผู้สมัคร ${unknownSexCount} ตัวที่ยังไม่ทราบเพศ — ยังไม่ยืนยันว่าผสมกับแมวต้นทางได้ (แสดงเป็นความเป็นไปได้เชิงโมเดล ไม่ใช่การยืนยันความเข้ากัน)`,
+      `มีผู้สมัคร ${unknownSexCount} ตัวที่ยังไม่ทราบเพศ — แสดงในกลุ่มรอยืนยัน แยกจากอันดับคำนวณ`,
     );
   }
 
   return {
     kind: "target_search",
     candidates,
+    pendingCandidates: pending.sort((a, b) => a.candidateCatId.localeCompare(b.candidateCatId)),
     unsupportedTargets,
     evaluatedCount: evaluated,
     eligibleCount: eligible,
@@ -260,14 +250,14 @@ export function analyzeTarget(input: TargetAnalysisInput): TargetSearchResult {
     // ความครบของผลต้องรวมสถานะข้อมูลของผู้สมัครทุกตัวด้วย (ALG-06)
     // (หมวดที่ไม่รองรับไม่ใส่ใน omitted เพื่อไม่ให้ UI นับเป็นจำนวนแมวที่ถูกตัด)
     coverage: {
-      complete: targetCats.length > 0 && omitted.length === 0 && unsupportedTargets.length === 0 && !jointUnsupported && unresolvedCount === 0,
+      complete: targetCats.length > 0 && omitted.length === 0 && pending.length === 0 && unsupportedTargets.length === 0 && !jointUnsupported && unresolvedCount === 0,
       omitted,
     },
     versions: {
       engineVersion: ENGINE_VERSION,
       rulesetVersion: RULESET_REGISTRY_VERSION,
       inputSchemaVersion: "1",
-      resultSchemaVersion: "1",
+      resultSchemaVersion: "2",
     },
   };
 }

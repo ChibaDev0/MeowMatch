@@ -7,7 +7,7 @@ import type { PairAnalysisInput, TargetAnalysisInput } from "@/domain/genetics/c
 import type { AnalysisResult } from "@/domain/genetics/contracts/types";
 import { analyzePair } from "@/domain/genetics/pair/analyze";
 import { analyzeTarget } from "@/domain/genetics/ranking/target";
-import artifact from "./artifacts/engine-0.1.1.json";
+import artifact from "./artifacts/engine-0.2.0.json";
 import type { Json } from "@/types/database";
 
 export type Snapshot =

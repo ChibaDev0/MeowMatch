@@ -12,13 +12,14 @@ import { PairResultView } from "./pair-result";
  * เลือกแมว 2 ตัวเพื่อวิเคราะห์ (PAIR-01)
  * A = แมวของฉันเท่านั้น; B = แมวของฉันหรือแมวที่กดใจ
  * ปุ่ม "วิเคราะห์ลูกแมว" เรียก engine จริงผ่าน server action แล้วแสดงผลรายลักษณะตามสถานะจริง
- * (ค่าเริ่มต้นจะเป็น "ยังไม่รองรับ" เพราะยังไม่มี ruleset ที่ผ่านผู้เชี่ยวชาญ — RES-01)
+ * รุ่น demo: เปิดโหมดคำนวณด้วย algorithm เป็นค่าเริ่มต้น เพื่อให้กดแล้วเห็นผล + อ้างอิงที่มาได้
+ * (ยังไม่ใช่ผลที่ผ่านผู้เชี่ยวชาญ — ติดป้าย "โหมดสาธิต" กำกับเสมอ; ปิด checkbox เพื่อดูสถานะจริง)
  */
 export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; likedCats: CatView[] }) {
   const [a, setA] = useState<string | null>(null);
   const [bTab, setBTab] = useState<"mine" | "liked">("mine");
   const [b, setB] = useState<string | null>(null);
-  const [demo, setDemo] = useState(false);
+  const [demo, setDemo] = useState(true);
   const [result, setResult] = useState<PairAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

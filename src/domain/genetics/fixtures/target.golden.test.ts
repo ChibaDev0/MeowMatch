@@ -199,7 +199,7 @@ describe("analyzeTarget — เป้าหมายที่ไม่รอง�
 });
 
 describe("analyzeTarget — สถานะเพศของผู้สมัคร (P5-02)", () => {
-  it("ผู้สมัครเพศไม่ทราบ → ยังจัดอันดับได้ แต่ติดธง sexCompatibility=unknown + warning", () => {
+  it("ผู้สมัครเพศไม่ทราบ → แยกจากอันดับเป็นรอยืนยัน + warning", () => {
     const res = analyzeTarget(
       demo({
         source: cat("src", { sex: "female", phenotype: { coat_type: "ขนยาว" } }),
@@ -207,8 +207,9 @@ describe("analyzeTarget — สถานะเพศของผู้สมั�
         candidates: [cat("u", { sex: "unknown", phenotype: { coat_type: "ขนยาว" } })],
       }),
     );
-    expect(res.eligibleCount).toBe(1);
-    expect(res.candidates[0]!.sexCompatibility).toBe("unknown");
+    expect(res.eligibleCount).toBe(0);
+    expect(res.candidates).toHaveLength(0);
+    expect(res.pendingCandidates[0]!.sexCompatibility).toBe("unknown");
     expect(res.warnings.some((w) => w.includes("ยังไม่ทราบเพศ"))).toBe(true);
   });
 });

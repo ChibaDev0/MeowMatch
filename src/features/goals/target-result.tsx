@@ -31,14 +31,14 @@ function scoreText(c: RankedCandidate): string {
   return "—";
 }
 
-function CandidateRow({ cand, rank }: { cand: RankedCandidate; rank: number }) {
+function CandidateRow({ cand, rank }: { cand: RankedCandidate; rank?: number }) {
   const meta = STATUS_META[cand.status];
   return (
     <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
       <div className="flex items-center gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
+        {rank !== undefined && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
           {rank}
-        </span>
+        </span>}
         <div className="space-y-1">
           <p className="font-medium text-ink">{cand.candidateName}</p>
           <div className="flex flex-wrap gap-1">
@@ -68,6 +68,9 @@ export function TargetResultView({
   result: TargetSearchResult;
   pool?: CandidatePoolInfo;
 }) {
+  // Stored v1 results may still contain unknown-sex candidates in the ranked list.
+  const ranked = result.candidates.filter((c) => c.sexCompatibility === "confirmed");
+  const pending = [...(result.pendingCandidates ?? []), ...result.candidates.filter((c) => c.sexCompatibility === "unknown")];
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-line bg-primary-50/50 p-3 text-xs text-muted">
@@ -85,21 +88,31 @@ export function TargetResultView({
         </div>
       )}
 
-      {result.candidates.length === 0 ? (
+      {ranked.length === 0 ? (
         <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
-          ไม่พบคู่ที่ประเมินได้ในแมวที่กดใจไว้ (ประเมิน {result.evaluatedCount} ตัว) — ลองกดใจแมวเพิ่ม
-          หรือปรับเป้าหมาย ไม่ได้แปลว่าเป็นไปไม่ได้ทางชีววิทยา
+          ไม่มีรายการในอันดับคำนวณ (ประเมิน {result.evaluatedCount} ตัว) โปรดตรวจข้อจำกัดและรายการรอยืนยันด้านล่าง
         </p>
       ) : (
-        <ol className="space-y-2">
-          {result.candidates.map((c, i) => (
+        <ol aria-label="อันดับคำนวณตามโมเดล" className="space-y-2">
+          {ranked.map((c, i) => (
             <CandidateRow key={c.candidateCatId} cand={c} rank={i + 1} />
           ))}
         </ol>
       )}
 
+      {pending.length > 0 && (
+        <section aria-label="รอยืนยันเพศ" className="space-y-2">
+          <h3 className="font-semibold text-ink">รอยืนยันเพศ — ยังไม่จัดเป็นคู่แนะนำ</h3>
+          <p className="text-sm text-muted">ตัวเลขเป็นผลภายใต้สมมติฐาน รายการนี้ไม่มีอันดับ</p>
+          <ul className="space-y-2">
+            {pending.map((c) => <CandidateRow key={c.candidateCatId} cand={c} />)}
+          </ul>
+        </section>
+      )}
+
       <p className="text-xs text-muted">
-        ประเมิน {result.evaluatedCount} ตัว · ผ่านเงื่อนไข {result.eligibleCount} ตัว
+        ประเมิน {result.evaluatedCount} ตัว · เข้าเกณฑ์จัดอันดับคำนวณ {result.eligibleCount} ตัว
+        {` · รอยืนยันเพศ ${pending.length} ตัว`}
         {result.coverage.omitted.length > 0 &&
           ` · ตัดด้วยเงื่อนไข ${result.coverage.omitted.length} ตัว`}{" "}
         · อันดับนี้หมายถึงเฉพาะรายการที่ประเมินแล้ว · engine v{result.versions.engineVersion}

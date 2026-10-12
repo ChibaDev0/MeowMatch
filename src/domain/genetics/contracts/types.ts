@@ -14,7 +14,7 @@ export type Probability = number | null;
 
 /**
  * ความเข้ากันด้านเพศของคู่ (P5-02) — แยก "ยืนยันแล้ว" ออกจาก "ยังไม่ทราบ" ชัดเจน
- *  - confirmed    = ทราบเพศทั้งคู่และผสมกันได้ (คนละเพศ)
+ *  - confirmed    = คนละเพศตามข้อมูลที่ได้รับเท่านั้น ไม่รับรองความพร้อมสืบพันธุ์
  *  - unknown      = อย่างน้อยหนึ่งตัวไม่ทราบเพศ → ยังไม่ยืนยันว่าผสมกันได้
  *  - incompatible = ทราบเพศทั้งคู่และเป็นเพศเดียวกัน → ผสมกันไม่ได้
  */
@@ -27,7 +27,7 @@ export type TraitOutcomeStatus =
   | "scenario_range" // ทราบเพียงช่วงตาม scenario set
   | "insufficient_data" // ข้อมูลไม่พอ ยังไม่เปิดผล
   | "unsupported" // ยังไม่มี ruleset ที่ผ่านตรวจสำหรับ trait นี้
-  | "conflicting_evidence" // หลักฐานขัดกันจน probability เป็น 0 ทั้งหมด
+  | "conflicting_evidence" // หลักฐานขัดกัน: ไม่คืน probability แทนด้วยศูนย์
   | "blocked" // ถูก welfare gate ระงับ (เช่น Fold × Fold) — ไม่ให้คำแนะนำ
   | "budget_exceeded"; // คำนวณเกิน budget ที่กำหนด
 
@@ -73,6 +73,8 @@ export interface PairAnalysisResult {
   traits: TraitResult[];
   /** ความเข้ากันด้านเพศของคู่ (P5-02) — UI ต้องไม่แสดง unknown เหมือนยืนยันแล้ว */
   sexCompatibility: SexCompatibility;
+  /** แยกความเหมาะสมคู่จากผลคณิตศาสตร์; model_only ไม่ใช่การรับรองสุขภาพ */
+  pairEligibility: "blocked" | "conditional" | "model_only";
   /** คำเตือนระดับผลรวม เช่น welfare gate, ข้อจำกัดของโหมดสาธิต (07-genetics-engine §warnings) */
   warnings: string[];
   coverage: Coverage;
@@ -99,6 +101,8 @@ export interface RankedCandidate {
 export interface TargetSearchResult {
   kind: "target_search";
   candidates: RankedCandidate[];
+  /** รอยืนยันเพศ: ไม่จัดอันดับตามคะแนน และไม่ใช้โควตา topK */
+  pendingCandidates: RankedCandidate[];
   /** หมวดเป้าหมายที่ยังไม่มี ruleset รองรับ → ทำให้ joint คำนวณครบไม่ได้ */
   unsupportedTargets: string[];
   evaluatedCount: number;

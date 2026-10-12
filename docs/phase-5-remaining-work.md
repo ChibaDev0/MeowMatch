@@ -1,5 +1,7 @@
 # Phase 5 — งานคงเหลือและเกณฑ์ตรวจรับ
 
+> **อัปเดตรอบดำเนินงาน 12 ต.ค. 2026:** ดู [ผลจากแพ็กเกจอนุมัติและบันทึกครบ 19 ข้อ](phase-5-approval/README.md) — engine 0.2.0 ใช้ข้อห้ามระดับคู่ร่วมกัน ระงับเมื่อรายงานหูพับอย่างน้อยหนึ่งฝ่าย และแยก unknown sex ออกจากอันดับแล้ว ภายใต้คำสั่งผู้ใช้ให้ค้นข้อมูลและทำต่อ เป็นนโยบายซอฟต์แวร์แบบระมัดระวัง ไม่ใช่ professional approval; รายการอนุมัติจริง/DNA consent ยังเปิด ข้อความพฤติกรรม runtime รุ่นก่อนด้านล่างเป็นประวัติ
+
 วิเคราะห์วันที่ 5 ตุลาคม 2026 · ผู้ตรวจ: เซน · ขอบเขต: checkout `D:/_DevProject/MeowMatch`
 
 ## สถานะและขอบเขตการตัดสิน
@@ -53,7 +55,7 @@ P1 = ต้องปิดก่อนเปิดฟีเจอร์จริ
 | P5-04 | History, replay, idempotency และ provenance | P1 | backend + DB acceptance 10 tests ผ่าน; feature ปิด รอ UI/refresh/E2E | HIST-01 / GEN-05 |
 | P5-05 | สิทธิ์ DB, consent และถอนข้อมูล | P1 | พบข้อจำกัดของ policy ใน migration; ยังไม่ทดสอบ DB จริง | SEC-01 / GEN-01 / HIST-01 |
 | P5-06 | Runtime validation และขอบเขตข้อมูล | P2; ยกระดับก่อนเปิด DNA | พบ validation ไม่ครบ; กรณีใหม่ยังไม่รันพิสูจน์ | GEN-02 / PAIR-01 / TARGET-01 |
-| P5-07 | Budget, ขนาดงาน และ coverage ที่สื่อความหมายตรงกัน | P2 | ยังไม่มี budget enforcement/benchmark ในเส้นทางที่ตรวจ | GEN-05 / TARGET-01 |
+| P5-07 | Budget, ขนาดงาน และ coverage ที่สื่อความหมายตรงกัน | P2 | มี benchmark engine แล้ว; budget/cancellation และเกณฑ์เวลาอนุมัติยังเปิด | GEN-05 / TARGET-01 |
 | P5-08 | E2E และหลักฐานปิดระยะ | P1 ก่อนปิด Phase 5 | ยังไม่มีหลักฐานทดสอบ analysis ครบเส้นทาง | QA-01 / PAIR-01 / TARGET-01 / HIST-01 |
 
 ## P5-01 — ดึงชุดผู้สมัครครบและไม่แปลงข้อผิดพลาดเป็นผลว่าง
@@ -106,6 +108,8 @@ P1 = ต้องปิดก่อนเปิดฟีเจอร์จริ
 
 ## P5-07 — Budget และความหมายของ coverage
 
+**อัปเดต 12 ตุลาคม 2026:** เพิ่มชุด benchmark ที่รันซ้ำได้ด้วย `npm run benchmark:genetics` ครอบคลุม pair/scenario และ target ถึง 10,001 ตัว พร้อมผลดิบและข้อจำกัดใน [รายงาน benchmark](phase-5-benchmark.md) ส่วน runtime budget/cancellation และการอนุมัติเป้าหมายเวลายังเปิด จึงยังไม่ปิด P5-07 ทั้งรายการ
+
 **หลักฐาน:** scenarioBounds แจกแจงทุกคู่ scenario; target ประเมินและ sort ผู้สมัครทั้งหมด ยังไม่พบ runtime budget enforcement ในเส้นทางเหล่านี้; coverage.omitted ใช้กับแมวที่ถูกกรอง ส่วนความไม่ครบของโมเดลอยู่คนละ field/status
 
 **ต้องทำ:** วัดเวลาบนขนาดข้อมูลที่รองรับจริงก่อนกำหนด candidate/scenario limits; กำหนดแยก pool completeness, evaluation completeness, model/evidence completeness และจำนวนที่ถูกกรองกับจำนวนที่ไม่ประเมิน ประเมินครบแต่ถูก hard constraint ไม่ใช่เหตุผลว่าค้นหาไม่ครบ ถ้าหยุดกลางทางให้ searchComplete=false พร้อม omitted reasons/budget status และห้ามเรียก partial ranges ว่าขอบเขตครบ
@@ -137,7 +141,7 @@ Bayesian Network/Variable Elimination, Dynamic Programming, Monte Carlo แล�
 - [ ] P5-04 ผลทั้งสองโหมดมี history/idempotency/provenance/replay ที่ตรวจได้
 - [ ] P5-05 สิทธิ์และถอนข้อมูลผ่าน DB tests จริง
 - [x] P5-06 payload และขอบเขตโมเดลผ่าน runtime validation (zod ที่ server action + isValidGenotype + canonical phenotype + topK guard + empty-set) พร้อมเทสต์
-- [ ] P5-07 มีขอบเขตงาน/benchmark และรายงาน partial results ถูกต้อง
+- [~] P5-07 มี benchmark engine 63 workload แล้ว; ยังรอ runtime budget/cancellation, partial-result contract และอนุมัติเกณฑ์เวลา ดู [ผลและข้อจำกัด](phase-5-benchmark.md)
 - [ ] P5-08 แนบผลรันครบเส้นทางของ revision ที่ส่งตรวจ
 
 การเลือก demo release เป็นการจำกัดขอบเขตส่งมอบ ต้องระบุชัดว่ายังไม่ใช่การผ่าน Phase 5 สำหรับผลพันธุกรรมจริง

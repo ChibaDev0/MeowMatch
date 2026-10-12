@@ -23,12 +23,11 @@ import { genotypeKey } from "../transmission/mendelian";
 import type { PhenotypeRuleset } from "../rules/types";
 import { RULESET_REGISTRY_VERSION, resolveRuleset } from "../rules/registry";
 import { outcomeDistribution, scenarioBounds } from "../inference/scenario";
-import { checkPairWelfare } from "../constraints/welfare";
-import { classifySexCompatibility, pairSexIncompatible } from "../constraints/biology";
+import { assessPairEligibility, HEALTH_LIMITATION, MODEL_LIMITATION } from "../constraints/eligibility";
 
-export const ENGINE_VERSION = "0.1.1";
+export const ENGINE_VERSION = "0.2.0";
 const INPUT_SCHEMA_VERSION = "1";
-const RESULT_SCHEMA_VERSION = "1";
+const RESULT_SCHEMA_VERSION = "2";
 
 /** สถานะที่ถือว่า "ได้ผลที่ใช้ได้" — นอกเหนือจากนี้จะถูกรายงานใน coverage.omitted */
 function isResolved(status: TraitOutcomeStatus): boolean {
@@ -103,14 +102,9 @@ function buildTrait(
   category: TraitCategory,
   input: PairAnalysisInput,
   pairBlocked: { reason: string; references: string[] } | null,
-  welfareByCategory: Map<TraitCategory, { reason: string; references: string[] }>,
 ): TraitResult {
   // 1) ข้อห้ามระดับคู่ (เพศผสมกันไม่ได้) → ระงับทุก trait
   if (pairBlocked) return blockedTrait(category, pairBlocked.reason, pairBlocked.references);
-
-  // 2) welfare gate เฉพาะหมวด (เช่น Fold × Fold → ear_type)
-  const welfare = welfareByCategory.get(category);
-  if (welfare) return blockedTrait(category, welfare.reason, welfare.references);
 
   // 3) ต้องมี ruleset ที่ใช้ได้
   const ruleset = resolveRuleset(category, input.allowUnverifiedRulesets ?? false);
@@ -189,38 +183,22 @@ function buildTrait(
 }
 
 export function analyzePair(input: PairAnalysisInput): PairAnalysisResult {
-  // ข้อห้าม/สถานะระดับคู่ (P5-02 — decision table ร่วมกับโหมด target)
-  const sexCompatibility = classifySexCompatibility(input.a, input.b);
-  const sexBlocked = pairSexIncompatible(input.a, input.b)
-    ? {
-        reason: "แมวทั้งสองเป็นเพศเดียวกันที่ทราบแน่ จึงผสมกันให้เกิดลูกไม่ได้ — ระงับผลการวิเคราะห์",
-        references: [] as string[],
-      }
-    : null;
-
-  // หมายเหตุขอบเขต (P5-02): welfare แบบ Fold × Fold ระงับเฉพาะหมวด ear_type ในโหมด pair
-  // (ผู้ใช้เลือกคู่นี้เอง จึงแสดงลักษณะอื่นได้) ต่างจากโหมด target ที่ "ไม่แนะนำ" คู่นี้จึงตัดทั้งตัว
-  const welfare = checkPairWelfare(input.a, input.b);
-  const welfareByCategory = new Map(
-    welfare.map((w) => [w.category, { reason: w.reason, references: w.references }] as const),
-  );
-
-  const traits = input.categories.map((c) =>
-    buildTrait(c, input, sexBlocked, welfareByCategory),
-  );
+  const eligibility = assessPairEligibility(input.a, input.b);
+  const { sexCompatibility } = eligibility;
+  const pairBlocked = eligibility.status === "blocked" ? {
+    reason: eligibility.reasons.map((r) => r.reason).join("; "),
+    references: [...new Set(eligibility.reasons.flatMap((r) => r.references))],
+  } : null;
+  const traits = input.categories.map((c) => buildTrait(c, input, pairBlocked));
 
   const omitted = traits
     .filter((t) => !isResolved(t.status))
     .map((t) => `${t.category}: ${t.status}`);
 
-  const warnings: string[] = [];
-  if (sexBlocked) warnings.push(sexBlocked.reason);
-  else if (sexCompatibility === "unknown") {
-    warnings.push(
-      "เพศของแมวอย่างน้อยหนึ่งตัวยังไม่ยืนยัน — ผลเป็นการคำนวณภายใต้สมมติฐาน ยังไม่ยืนยันว่าคู่นี้ผสมกันได้",
-    );
+  const warnings = [MODEL_LIMITATION, HEALTH_LIMITATION, ...eligibility.reasons.map((r) => r.reason)];
+  if (sexCompatibility === "unknown") {
+    warnings.push("เพศของแมวอย่างน้อยหนึ่งตัวยังไม่ยืนยัน ผลนี้เป็นการคำนวณภายใต้สมมติฐาน และยังไม่จัดเป็นคู่แนะนำ");
   }
-  warnings.push(...welfare.map((w) => w.reason));
   if (input.allowUnverifiedRulesets) {
     warnings.push(
       "เปิดโหมดสาธิตคณิตศาสตร์ (ชุดกฎที่ยังไม่ผ่านการตรวจรับ) — ตัวเลขเป็นตัวอย่างการคำนวณ ไม่ใช่ผลจริงสำหรับแมวของคุณ",
@@ -231,6 +209,7 @@ export function analyzePair(input: PairAnalysisInput): PairAnalysisResult {
     kind: "pair",
     traits,
     sexCompatibility,
+    pairEligibility: eligibility.status,
     warnings,
     coverage: { complete: omitted.length === 0, omitted },
     versions: {

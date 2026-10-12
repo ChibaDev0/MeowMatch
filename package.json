@@ -13,6 +13,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "benchmark:genetics": "vitest run --config vitest.benchmark.config.ts",
     "test:db": "vitest run --config vitest.live-db.config.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",

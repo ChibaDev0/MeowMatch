@@ -59,6 +59,22 @@ describe("analyzeTargetAction — runtime validation (P5-06)", () => {
 });
 
 describe("analyzeTargetAction — ตรวจสิทธิ์/อินพุต", () => {
+  it("keeps unknown sex pending after server mapping, outside rankings", async () => {
+    vi.mocked(getAnalysisCandidates).mockResolvedValue(pool({ cats: [cat("u", { sex: "unknown", coat: "ขนยาว" }), LIKED_MALE], fetched: 2, expected: 2 }));
+    const res = await analyzeTargetAction("src", { coat: "ขนยาว" }, { demo: true });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.result.candidates.map((c) => c.candidateCatId)).toEqual(["m"]);
+    expect(res.result.pendingCandidates[0]?.candidateCatId).toBe("u");
+    expect(res.result.evaluatedCount).toBe(2);
+  });
+  it("blocks a single reported Fold through server mapping for a coat-only target", async () => {
+    vi.mocked(getAnalysisCandidates).mockResolvedValue(pool({ cats: [cat("f", { sex: "male", coat: "ขนยาว", ear: "หูพับ" })] }));
+    const res = await analyzeTargetAction("src", { coat: "ขนยาว" }, { demo: true });
+    if (!res.ok) throw new Error(res.error);
+    expect(res.result.candidates).toEqual([]);
+    expect(res.result.pendingCandidates).toEqual([]);
+    expect(res.result.coverage.omitted.join()).toContain("welfare_blocked");
+  });
   it("unsupported hairless selection remains unknown through label mapping", async () => {
     const res = await analyzeTargetAction("src", { coat: "ไม่มีขน" }, { demo: true });
     expect(res.ok).toBe(true);

@@ -7,9 +7,10 @@ import type { AnalysisParent, PairAnalysisInput } from "../contracts/input";
  * ตัวเลขอ้างอิงตารางใน MeowMatch/10-algorithm-design §1 (ตัวอย่างคณิตศาสตร์ ไม่ใช่กฎ FGF5 จริง)
  */
 
+let parentId = 0;
 function parent(over: Partial<AnalysisParent>): AnalysisParent {
   return {
-    catId: over.catId ?? "x",
+    catId: over.catId ?? `parent-${++parentId}`,
     name: over.name ?? "แมว",
     sex: over.sex ?? "unknown",
     phenotype: over.phenotype ?? {},
@@ -186,16 +187,16 @@ describe("analyzePair — welfare gate", () => {
     expect(res.warnings.some((w) => w.includes("Fold"))).toBe(true);
   });
 
-  it("หูพับ × หูตั้ง → ไม่ถูก block (แต่ ear_type ยัง unsupported เพราะไม่มี ruleset)", () => {
+  it("หูพับ × หูตั้ง → ระงับตามนโยบายสวัสดิภาพ", () => {
     const res = analyzePair({
       categories: ["ear_type"],
       allowUnverifiedRulesets: true,
       a: parent({ sex: "female", phenotype: { ear_type: "หูพับ" } }),
       b: parent({ sex: "male", phenotype: { ear_type: "หูตั้ง" } }),
     });
-    expect(res.traits[0]!.status).toBe("unsupported");
-    expect(res.warnings.some((w) => w.includes("Fold"))).toBe(false); // ไม่โดน welfare block
-    expect(res.warnings).toHaveLength(1); // เฉพาะ warning โหมดสาธิต (เพศครบ จึงไม่มี warning เพศ)
+    expect(res.traits[0]!.status).toBe("blocked");
+    expect(res.warnings.some((w) => w.includes("Fold"))).toBe(true);
+    expect(res.warnings.join()).toContain("ไม่ใช่การรับรอง");
   });
 });
 
