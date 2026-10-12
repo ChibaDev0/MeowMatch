@@ -13,7 +13,10 @@ export const targetLabelsSchema = z.object({
   eye: z.string().trim().max(64).optional(),
   ear: z.string().trim().max(64).optional(),
 });
-export const analysisOptsSchema = z.object({ demo: z.boolean().optional() }).optional();
+export const analysisOptsSchema = z
+  .object({ demo: z.boolean().optional(), idempotencyKey: z.string().uuid().optional() })
+  .strict()
+  .optional();
 
 /**
  * ตัวช่วยแปลงข้อมูลสำหรับชั้นวิเคราะห์ (ใช้ร่วมกันระหว่าง pair/target action)

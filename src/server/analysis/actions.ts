@@ -4,6 +4,9 @@ import type { PairAnalysisResult } from "@/domain/genetics/contracts/types";
 import { analyzePair } from "@/domain/genetics/pair/analyze";
 import { getLikedCats, getMyCats } from "@/server/cats/queries";
 import { ANALYZED_CATEGORIES, analysisCatIdSchema, analysisOptsSchema, catToParent } from "./map";
+import { withHistory, type HistoryReceipt } from "./history";
+import type { PairAnalysisInput } from "@/domain/genetics/contracts/input";
+import { z } from "zod";
 
 /**
  * วิเคราะห์คู่ (PAIR-01) — ชั้น server เป็นผู้ "ตรวจสิทธิ์" ก่อนส่งให้ engine (07-genetics-engine §A)
@@ -13,13 +16,12 @@ import { ANALYZED_CATEGORIES, analysisCatIdSchema, analysisOptsSchema, catToPare
  */
 
 export type PairAnalysisResponse =
-  | { ok: true; result: PairAnalysisResult }
-  | { ok: false; error: string };
+  { ok: true; result: PairAnalysisResult; history?: HistoryReceipt } | { ok: false; error: string };
 
 export async function analyzePairAction(
   aId: string,
   bId: string,
-  opts?: { demo?: boolean },
+  opts?: { demo?: boolean; idempotencyKey?: string },
 ): Promise<PairAnalysisResponse> {
   // ตรวจ payload ตอน runtime ก่อน (P5-06)
   const aParsed = analysisCatIdSchema.safeParse(aId);
@@ -34,21 +36,44 @@ export async function analyzePairAction(
   bId = bParsed.data;
   if (aId === bId) return { ok: false, error: "เลือกแมวตัวเดียวกันไม่ได้" };
 
-  const [myCats, likedCats] = await Promise.all([getMyCats(), getLikedCats()]);
+  try {
+    return await withHistory<PairAnalysisResponse>(
+      opts?.idempotencyKey,
+      { kind: "pair", aId, bId, demo: opts?.demo ?? false },
+      async () => {
+        const [myCats, likedCats] = await Promise.all([getMyCats(), getLikedCats()]);
 
-  const a = myCats.find((c) => c.id === aId);
-  if (!a) return { ok: false, error: "แมวตัวที่ 1 ต้องเป็นแมวของคุณ" };
+        const a = myCats.find((c) => c.id === aId);
+        if (!a)
+          return { response: { ok: false, error: "แมวตัวที่ 1 ต้องเป็นแมวของคุณ" }, real: false };
 
-  const b =
-    myCats.find((c) => c.id === bId) ?? likedCats.find((c) => c.id === bId);
-  if (!b) return { ok: false, error: "แมวตัวที่ 2 ต้องเป็นแมวของคุณหรือแมวที่กดใจไว้" };
+        const b = myCats.find((c) => c.id === bId) ?? likedCats.find((c) => c.id === bId);
+        if (!b)
+          return {
+            response: { ok: false, error: "แมวตัวที่ 2 ต้องเป็นแมวของคุณหรือแมวที่กดใจไว้" },
+            real: false,
+          };
 
-  const result = analyzePair({
-    categories: ANALYZED_CATEGORIES,
-    a: catToParent(a),
-    b: catToParent(b),
-    allowUnverifiedRulesets: opts?.demo ?? false,
-  });
+        const input: PairAnalysisInput = {
+          categories: ANALYZED_CATEGORIES,
+          a: catToParent(a),
+          b: catToParent(b),
+          allowUnverifiedRulesets: opts?.demo ?? false,
+        };
+        const result = analyzePair(input);
 
-  return { ok: true, result };
+        return {
+          response: { ok: true, result },
+          snapshot: { kind: "pair", input },
+          real:
+            z.string().uuid().safeParse(a.id).success && z.string().uuid().safeParse(b.id).success,
+        };
+      },
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "ไม่สามารถบันทึกผลวิเคราะห์ได้",
+    };
+  }
 }

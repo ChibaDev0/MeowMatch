@@ -31,14 +31,26 @@ P1 = ต้องปิดก่อนเปิดฟีเจอร์จริ
 
 หลักฐาน: `npm test` 185 ผ่าน, typecheck/lint/build ผ่าน เทสต์ครอบ 0 แถว, หลายหน้า, ล้มกลางหน้า (timeout), แมวถูกซ่อน, missing schema, exclude source (`server/cats/queries.test.ts`) และ provenance/`searchComplete` (`server/analysis/target-actions.test.ts`). **ยังเปิด:** ยืนยันบน DB จริง (ผูกกับ P5-05/P5-08) ยังไม่ได้ทำในชั้น unit/mock นี้
 
+## ความคืบหน้า increment 5 (5 ตุลาคม 2026) — P5-04 backend
+
+เพิ่ม migration `0007_analysis_history.sql` + history/idempotency/replay service และเชื่อม pair/target actions: canonical input snapshot, request/input hash แยกกัน, immutable source artifact, versions/provenance/coverage, read/replay ที่ตรวจสิทธิ์ปัจจุบัน, unique key/transaction และ redaction tombstone เมื่อถอนสิทธิ์ พร้อมปิด direct client writes ของ legacy history
+
+ค่าเริ่มต้น `ANALYSIS_HISTORY_ENABLED=false` จนกว่า DB acceptance จะผ่าน **ยังไม่ได้ apply migration หรือพิสูจน์ PostgreSQL concurrency/RLS/trigger จริง และยังไม่มีหน้าประวัติ/การเก็บ key/runId ข้าม refresh ใน UI** จึงเป็นการเสร็จส่วน backend ไม่ใช่ปิด P5-04/P5-05/P5-08 ทั้งหมด รายละเอียดและ checklist อยู่ใน [P5-04 history](phase-5-history.md)
+
+หลักฐานรอบนี้: `npm test` **201 ข้อ / 16 ไฟล์ ผ่านทั้งหมด** (เพิ่ม history 16 tests), `npm run typecheck`, `npm run lint`, `npm run build` ผ่าน exit code 0 การรัน test/lint ใน sandbox ครั้งแรกติด Windows realpath/Access denied; รันซ้ำนอก sandbox ที่ได้รับอนุญาตแล้วผ่าน ไม่ได้ใช้ผลรันที่มี unhandled errors เป็นหลักฐานผ่าน
+
+ส่งข้อที่รอผู้เชี่ยวชาญ P5-02/RES-01 + P5-03 ไปแชท “ตรวจสอบและทดสอบ Algorithm” แล้ว ได้ [รายการคำตัดสินและหลักฐานผู้เชี่ยวชาญ](phase-5-expert-review.md) สถานะอนุมัติยัง PENDING ทั้งหมด P5-05/07/08 ยังแยกรอ DB/benchmark/app
+
 ## ภาพรวมงานที่ยังเปิด
+
+อัปเดต increment 6 (12 ตุลาคม 2026): apply 0007 บน DB จริงแล้ว ผ่าน live DB tests 10 ข้อ รวม permissions, 20 concurrent requests, replay, redaction และ ownership transfer พร้อมตรวจ cleanup ดู [รายงาน DB](phase-5-live-db.md) P5-04 เหลือ UI/refresh/E2E; P5-05 ยังไม่ปิดส่วน DNA/consent และนโยบายที่ต้องรับรอง
 
 | ID | งาน | ระดับ | สถานะหลักฐาน | เชื่อม backlog |
 |---|---|---|---|---|
 | P5-01 | Candidate pool, error และแหล่งข้อมูลสาธิต | P1 | พบช่องว่างใน server query/contract | TARGET-01 / PAIR-01 |
 | P5-02 | ข้อห้ามระดับคู่และเพศไม่ทราบ | P1 | พบพฤติกรรมไม่สอดคล้องจากโค้ด; ต้องกำหนดนโยบาย | RES-01 / GEN-02 / TARGET-01 |
 | P5-03 | กฎที่รองรับจริงและหลักฐาน DNA | P1 ก่อนเปิดผลจริง | registry ยังมีเฉพาะ demo; server ยังส่ง phenotype | RES-01 / GEN-01 |
-| P5-04 | History, replay, idempotency และ provenance | P1 | มีตารางตั้งต้น แต่ actions ไม่บันทึกผล | HIST-01 / GEN-05 |
+| P5-04 | History, replay, idempotency และ provenance | P1 | backend + DB acceptance 10 tests ผ่าน; feature ปิด รอ UI/refresh/E2E | HIST-01 / GEN-05 |
 | P5-05 | สิทธิ์ DB, consent และถอนข้อมูล | P1 | พบข้อจำกัดของ policy ใน migration; ยังไม่ทดสอบ DB จริง | SEC-01 / GEN-01 / HIST-01 |
 | P5-06 | Runtime validation และขอบเขตข้อมูล | P2; ยกระดับก่อนเปิด DNA | พบ validation ไม่ครบ; กรณีใหม่ยังไม่รันพิสูจน์ | GEN-02 / PAIR-01 / TARGET-01 |
 | P5-07 | Budget, ขนาดงาน และ coverage ที่สื่อความหมายตรงกัน | P2 | ยังไม่มี budget enforcement/benchmark ในเส้นทางที่ตรวจ | GEN-05 / TARGET-01 |

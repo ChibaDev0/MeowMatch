@@ -3,6 +3,9 @@
 import type { TraitCategory } from "@/lib/validation/common";
 import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
 import { analyzeTarget } from "@/domain/genetics/ranking/target";
+import type { TargetAnalysisInput } from "@/domain/genetics/contracts/input";
+import { withHistory, type HistoryReceipt } from "./history";
+import { z } from "zod";
 import { getAnalysisCandidates, getMyCats, type CandidateSource } from "@/server/cats/queries";
 import {
   analysisCatIdSchema,
@@ -36,7 +39,7 @@ export type CandidatePoolInfo = {
 };
 
 export type TargetAnalysisResponse =
-  | { ok: true; result: TargetSearchResult; pool: CandidatePoolInfo }
+  | { ok: true; result: TargetSearchResult; pool: CandidatePoolInfo; history?: HistoryReceipt }
   | { ok: false; error: string };
 
 function buildTargets(labels: TargetLabels): Partial<Record<TraitCategory, string>> {
@@ -50,7 +53,7 @@ function buildTargets(labels: TargetLabels): Partial<Record<TraitCategory, strin
 export async function analyzeTargetAction(
   sourceCatId: string,
   labels: TargetLabels,
-  opts?: { demo?: boolean },
+  opts?: { demo?: boolean; idempotencyKey?: string },
 ): Promise<TargetAnalysisResponse> {
   // ตรวจ payload ตอน runtime ก่อน (P5-06) — กันชนิด/รูปแบบผิดจาก client
   const idParsed = analysisCatIdSchema.safeParse(sourceCatId);
@@ -67,31 +70,49 @@ export async function analyzeTargetAction(
     return { ok: false, error: "กรุณาตั้งเป้าหมายลูกแมวอย่างน้อยหนึ่งลักษณะ" };
   }
 
-  const [myCats, pool] = await Promise.all([
-    getMyCats(),
-    getAnalysisCandidates(sourceId),
-  ]);
+  try {
+    return await withHistory<TargetAnalysisResponse>(
+      opts?.idempotencyKey,
+      { kind: "target_search", sourceId, targets, demo: opts?.demo ?? false },
+      async () => {
+        const [myCats, pool] = await Promise.all([getMyCats(), getAnalysisCandidates(sourceId)]);
 
-  const source = myCats.find((c) => c.id === sourceId);
-  if (!source) return { ok: false, error: "แมวต้นทางต้องเป็นแมวของคุณ" };
+        const source = myCats.find((c) => c.id === sourceId);
+        if (!source)
+          return { response: { ok: false, error: "แมวต้นทางต้องเป็นแมวของคุณ" }, real: false };
 
-  const result = analyzeTarget({
-    source: catToParent(source),
-    targets,
-    candidates: pool.cats.map(catToParent),
-    allowUnverifiedRulesets: opts?.demo ?? false,
-    poolComplete: pool.complete,
-  });
+        const input: TargetAnalysisInput = {
+          source: catToParent(source),
+          targets,
+          candidates: pool.cats.map(catToParent),
+          allowUnverifiedRulesets: opts?.demo ?? false,
+          poolComplete: pool.complete,
+        };
+        const result = analyzeTarget(input);
 
-  return {
-    ok: true,
-    result,
-    pool: {
-      source: pool.source,
-      complete: pool.complete,
-      error: pool.error,
-      fetched: pool.fetched,
-      expected: pool.expected,
-    },
-  };
+        return {
+          snapshot: { kind: "target_search", input },
+          real:
+            pool.source === "real" &&
+            [source, ...pool.cats].every((c) => z.string().uuid().safeParse(c.id).success),
+          response: {
+            ok: true,
+            result,
+            pool: {
+              source: pool.source,
+              complete: pool.complete,
+              error: pool.error,
+              fetched: pool.fetched,
+              expected: pool.expected,
+            },
+          },
+        };
+      },
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "ไม่สามารถบันทึกผลวิเคราะห์ได้",
+    };
+  }
 }

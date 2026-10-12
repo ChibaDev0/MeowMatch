@@ -194,6 +194,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      analysis_history: {
+        Args: { p_owner: string; p_key?: string; p_request_hash?: string; p_id?: string; p_envelope?: Json };
+        Returns: Json;
+      };
       username_available: {
         Args: { p_username: string };
         Returns: boolean;
