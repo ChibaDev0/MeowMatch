@@ -13,7 +13,7 @@
 | ID | งาน | สถานะ | หลักฐาน |
 |---|---|---|---|
 | SAFE-01 | report/moderation + account abuse limits | ✅ โค้ด + unit + live-DB ผ่าน | ด้านล่าง |
-| QA-01 | E2E, accessibility, load, security | ⏳ ยังไม่เริ่ม | — |
+| QA-01 | E2E, accessibility, load, security | ✅ a11y + E2E + load baseline ผ่าน | ด้านล่าง |
 | OPS-01 | monitoring, backups, restore, rollout | ⏳ ยังไม่เริ่ม | — |
 
 ---
@@ -59,6 +59,41 @@
 
 ### ยังเปิด / ขอบเขต
 
-- ยังไม่มี E2E ของเส้นทางรายงาน (รวมใน QA-01)
 - ไม่มี auto-moderation/ML — รายงานเข้าคิวให้ผู้ดูแลตัดสินด้วยมือ (ตามขอบเขต MVP)
 - การแต่งตั้ง admin ทำด้วย SQL/service-role (ไม่มี UI) — ตามข้อกำหนด PRD "ตั้งจากฝั่งระบบเท่านั้น"
+
+---
+
+## QA-01 — E2E, accessibility, load, security
+
+ปิดช่องว่างที่ Phase 4 QC เสนอต่อ (load test, axe a11y, authenticated journey) + E2E ของ SAFE-01
+
+### Accessibility (axe-core)
+
+- `tests/e2e/a11y.spec.ts` — สแกน `/login`, `/register`, `/forgot-password` ด้วย `@axe-core/playwright`
+  (WCAG 2.0/2.1 A & AA) fail เมื่อพบ violation ระดับ **serious/critical**
+- ผล: **ผ่านทั้ง 3 หน้า × 2 viewport** (desktop + mobile) ไม่มี serious/critical
+
+### E2E (Playwright)
+
+- ชุด public (ไม่ต้องบัญชี): `npx playwright test --project=chromium --project=mobile-chrome` → **38 ผ่าน**
+  (smoke, route-protection, responsive, auth-flow, a11y)
+- ชุด authenticated (opt-in `TEST_E2E_AUTH=1`): เพิ่มใน `authenticated.spec.ts` — **9 ผ่าน** รวม
+  - รายงานแมวในหน้าหาคู่ (เปิด modal → เลือกเหตุผล → ส่ง → "ส่งรายงานแล้ว")
+  - สมาชิกทั่วไปเข้า `/admin/reports` ถูกเด้ง `/home` และไม่เห็นลิงก์ศูนย์ดูแลชุมชนใน sidebar
+  - (เดิม) เข้าถึง /home, nav responsive, เพิ่มแมว
+  - ⚠️ เขียน/ลบผู้ใช้ทดสอบ + report บน Supabase remote จริง (teardown ลบทิ้ง → FK cascade)
+
+### Load test (autocannon)
+
+- harness `scripts/load/run.mjs` (`npm run load -- --url=... --duration= --connections=`) —
+  default endpoint `/api/v1/health` (read-only); fail เมื่อมี error/timeout/non-2xx
+- **baseline** (production build `next start`, เครื่อง dev local, 50 conns × 10s, `/api/v1/health`):
+  requests 8,897 · **rps_mean ≈ 890** · latency p50 41ms / p97.5 279ms / max 543ms · **0 error/timeout/non-2xx**
+  - หมายเหตุ: เป็นตัวเลขบนเครื่อง dev + build เท่านั้น ไม่ใช่เป้าหมาย capacity ของ production —
+    เป้าหมาย throughput/latency จริงต้องตกลงตามสภาพแวดล้อม deploy (OPS-01) และวัดบน endpoint ที่สื่อความหมาย
+
+### Security
+
+- Supabase security advisors หลัง 0008: **ไม่มี ERROR** (ดูหมวด SAFE-01) — gate ความปลอดภัยคงผ่าน
+- live-DB RLS/role/abuse/audit ครอบคลุมใน `npm run test:db` (22 ผ่าน)
