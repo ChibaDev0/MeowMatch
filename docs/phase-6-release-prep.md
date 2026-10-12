@@ -14,7 +14,7 @@
 |---|---|---|---|
 | SAFE-01 | report/moderation + account abuse limits | ✅ โค้ด + unit + live-DB ผ่าน | ด้านล่าง |
 | QA-01 | E2E, accessibility, load, security | ✅ a11y + E2E + load baseline ผ่าน | ด้านล่าง |
-| OPS-01 | monitoring, backups, restore, rollout | ⏳ ยังไม่เริ่ม | — |
+| OPS-01 | monitoring, backups, restore, rollout | ✅ runbook + restore-drill procedure + schema acceptance | [ops-runbook.md](ops-runbook.md) |
 
 ---
 
@@ -97,3 +97,28 @@
 
 - Supabase security advisors หลัง 0008: **ไม่มี ERROR** (ดูหมวด SAFE-01) — gate ความปลอดภัยคงผ่าน
 - live-DB RLS/role/abuse/audit ครอบคลุมใน `npm run test:db` (22 ผ่าน)
+
+---
+
+## OPS-01 — monitoring, backups, restore, rollout
+
+คู่มือปฏิบัติการเต็มอยู่ที่ **[ops-runbook.md](ops-runbook.md)** ครอบคลุม: สภาพแวดล้อม/secret,
+ลำดับ migration, monitoring (health endpoint + advisors + log + moderation queue), backups
+(รวม storage `cat-photos`), rollout + smoke, rollback, **restore drill** (Supabase branch/scratch +
+acceptance), schema acceptance query และ incident response
+
+### หลักฐาน
+
+- migrations remote **0001–0008 ครบ** (ตรวจด้วย `list_migrations`) — รวม 0005 storage (อัปโหลดรูปพร้อม) + 0008 moderation
+- project `ACTIVE_HEALTHY`, Postgres 17, region ap-southeast-2
+- **schema acceptance query** (ข้อ 8 ของ runbook) รันจริงบน remote: tables_present=8, profiles.role=1,
+  cats.moderation_status=1, funcs=5, **tables_without_rls=0** (ทุกตาราง public เปิด RLS)
+- health endpoint ตอบ 200; load baseline (QA-01) ไม่มี error
+- restore drill เป็น **procedure ที่รันได้** (acceptance = schema check + `npm run test:db` 22 + smoke);
+  การรัน restore จริงบน Supabase branch มีค่าใช้จ่าย → รอผู้ใช้อนุมัติก่อนทำบน staging
+
+### ยังเปิด / ขอบเขต
+
+- ยังไม่ได้ **รัน** restore drill จริงบน staging branch (ต้องอนุมัติค่าใช้จ่าย Supabase branch) — procedure พร้อมแล้ว
+- Backup schedule/PITR ตั้งค่าใน Supabase dashboard ตาม plan (runbook ระบุค่าที่แนะนำ)
+- External uptime monitor ยังไม่ได้ผูกบริการจริง (runbook ระบุวิธี)
