@@ -39,6 +39,7 @@ function toView(row: CatRow, liked = false): CatView {
     sex: row.sex,
     liked,
     isPublic: row.is_public,
+    moderationStatus: row.moderation_status ?? "active",
     photo: catPhotoSrc(row.photo_path),
   };
 }

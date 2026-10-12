@@ -15,7 +15,17 @@ export type Json =
 
 export type OnboardingStatus = "needs_username" | "complete";
 
+export type UserRole = "member" | "admin";
+
 export type CatSexDb = "male" | "female" | "unknown";
+
+export type ModerationStatus = "active" | "hidden";
+
+export type ReportReason = "inappropriate" | "spam" | "fake" | "animal_welfare" | "other";
+
+export type ReportStatus = "open" | "reviewing" | "actioned" | "dismissed";
+
+export type ModerationAction = "hide" | "unhide" | "dismiss" | "reviewing" | "reopen";
 
 export type CatRow = {
   id: string;
@@ -30,8 +40,33 @@ export type CatRow = {
   temperament: string | null;
   photo_path: string | null;
   is_public: boolean;
+  moderation_status: ModerationStatus;
   created_at: string;
   updated_at: string;
+};
+
+export type ReportRow = {
+  id: string;
+  reporter_id: string;
+  cat_id: string;
+  reason: ReportReason;
+  detail: string | null;
+  status: ReportStatus;
+  resolution: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ModerationActionRow = {
+  id: string;
+  report_id: string | null;
+  cat_id: string | null;
+  actor_id: string;
+  action: ModerationAction;
+  note: string | null;
+  created_at: string;
 };
 
 export type CatLikeRow = {
@@ -73,6 +108,7 @@ export type ProfileRow = {
   avatar_path: string | null;
   bio: string | null;
   onboarding_status: OnboardingStatus;
+  role: UserRole;
   created_at: string;
   updated_at: string;
 };
@@ -89,6 +125,7 @@ export type Database = {
           avatar_path?: string | null;
           bio?: string | null;
           onboarding_status?: OnboardingStatus;
+          role?: UserRole;
           created_at?: string;
           updated_at?: string;
         };
@@ -117,6 +154,7 @@ export type Database = {
           temperament?: string | null;
           photo_path?: string | null;
           is_public?: boolean;
+          moderation_status?: ModerationStatus;
           created_at?: string;
           updated_at?: string;
         };
@@ -131,8 +169,32 @@ export type Database = {
           temperament?: string | null;
           photo_path?: string | null;
           is_public?: boolean;
+          // moderation_status เปลี่ยนผ่าน RPC resolve_report เท่านั้น (ไม่เปิดให้ client update ตรง)
           updated_at?: string;
         };
+        Relationships: [];
+      };
+      reports: {
+        Row: ReportRow;
+        Insert: {
+          id?: string;
+          reporter_id: string;
+          cat_id: string;
+          reason: ReportReason;
+          detail?: string | null;
+          status?: ReportStatus;
+          created_at?: string;
+          updated_at?: string;
+        };
+        // update ทำผ่าน RPC resolve_report เท่านั้น
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      moderation_actions: {
+        Row: ModerationActionRow;
+        // insert ทำผ่าน RPC resolve_report (security definer) เท่านั้น
+        Insert: Record<string, never>;
+        Update: Record<string, never>;
         Relationships: [];
       };
       cat_likes: {
@@ -205,6 +267,14 @@ export type Database = {
       auth_email_for_username: {
         Args: { p_username: string };
         Returns: string | null;
+      };
+      is_admin: {
+        Args: Record<string, never>;
+        Returns: boolean;
+      };
+      resolve_report: {
+        Args: { p_report_id: string; p_decision: ModerationAction; p_note?: string | null };
+        Returns: ReportRow;
       };
     };
     Enums: Record<string, never>;

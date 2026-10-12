@@ -57,3 +57,20 @@ export async function requireProfile(): Promise<ProfileRow> {
   }
   return profile;
 }
+
+/** true ถ้าผู้ใช้ปัจจุบันเป็นผู้ดูแล (role = admin) — อ่านจาก profiles ของตัวเอง */
+export async function isAdmin(): Promise<boolean> {
+  const profile = await getProfile();
+  return profile?.role === "admin";
+}
+
+/**
+ * บังคับว่าต้องเป็นผู้ดูแล มิฉะนั้น redirect
+ * - ไม่ล็อกอิน/ยังไม่ onboarding → เส้นทางเดียวกับ requireProfile
+ * - ล็อกอินแล้วแต่ไม่ใช่ admin → /home (ไม่เปิดเผยว่ามีหน้า admin อยู่)
+ */
+export async function requireAdmin(): Promise<ProfileRow> {
+  const profile = await requireProfile();
+  if (profile.role !== "admin") redirect("/home");
+  return profile;
+}

@@ -1,0 +1,64 @@
+# Phase 6 — เตรียมเปิดใช้ (release prep)
+
+> ระยะ 6 ตาม `MeowMatch/03-tasks.md`: hardening, restore drill, moderation, คู่มือปฏิบัติการ
+> เงื่อนไขผ่าน: **release gates ใน QC ผ่านครบ**
+>
+> ขอบเขตงานพันธุกรรม Phase 7 (GEN-03/04, SIM-01/02) ยัง **บล็อกที่ RES-01** (ผู้เชี่ยวชาญ/prior จริง) —
+> ทำได้เฉพาะ infra ที่ปิด gate ไว้ ไม่ปล่อยเปอร์เซ็นต์พันธุกรรมจริง
+
+อัปเดต: 2026-10-12
+
+## สถานะรายงาน (backlog Phase 6)
+
+| ID | งาน | สถานะ | หลักฐาน |
+|---|---|---|---|
+| SAFE-01 | report/moderation + account abuse limits | ✅ โค้ด + unit + live-DB ผ่าน | ด้านล่าง |
+| QA-01 | E2E, accessibility, load, security | ⏳ ยังไม่เริ่ม | — |
+| OPS-01 | monitoring, backups, restore, rollout | ⏳ ยังไม่เริ่ม | — |
+
+---
+
+## SAFE-01 — รายงาน / ดูแลชุมชน / abuse limits
+
+ปิดคำขอใน PRD "รายงานข้อมูลไม่เหมาะสม" และเงื่อนไข SAFE-01
+("ซ่อน listing ที่ถูกรายงานได้ตาม role และมี audit").
+
+### สิ่งที่ทำ
+
+- **migration `0008_moderation.sql`** (apply บน remote `qgkajyuoaffydydqbouv` แล้ว 2026-10-12):
+  - `profiles.role` (member/admin) + **trigger `guard_profile_role`** กันสมาชิกยกระดับ role ตัวเอง
+    (SECURITY INVOKER → `current_user <> 'service_role'` คงค่าเดิมเงียบ ๆ) — ตั้ง admin ได้จากฝั่งระบบเท่านั้น
+  - `is_admin()` (SECURITY DEFINER) อ่าน role ข้าม RLS ใช้ร่วมใน RLS/RPC
+  - `cats.moderation_status` (active/hidden) + ปรับ RLS select ของ cats ให้ซ่อนแมว `hidden`
+    จากสมาชิกคนอื่น/anon แต่เจ้าของและ admin ยังเห็น
+  - ตาราง `reports` (เหตุผล/รายละเอียด/สถานะ) + RLS: insert ตัวเอง & ห้ามรายงานแมวตัวเอง,
+    select เฉพาะของตัวเองหรือ admin; **ไม่มี update/delete policy** (เปลี่ยนสถานะผ่าน RPC เท่านั้น)
+  - **abuse limit:** unique partial index `reports_open_unique` กันรายงานซ้ำ (เปิดค้าง) ต่อ (ผู้รายงาน, แมว)
+  - ตาราง `moderation_actions` (**audit** การกระทำผู้ดูแล) select เฉพาะ admin
+  - RPC `resolve_report(report_id, decision, note)` (SECURITY DEFINER, ตรวจ `is_admin()` ภายใน) —
+    transaction เดียว: อัปเดตรายงาน + ระงับ/คืนแมว + บันทึก audit (hide/unhide/dismiss/reviewing/reopen)
+- **server:** `src/server/moderation/actions.ts` (`reportCatAction`, `resolveReportAction`) +
+  `queries.ts` (`getReportQueue`); `requireAdmin`/`isAdmin` ใน `server/auth/session.ts`
+- **UI:** ปุ่มรายงานบนการ์ดหน้าหาคู่ (`features/moderation/report-button.tsx`),
+  หน้าผู้ดูแล `/admin/reports` (`AdminReports`) เข้าได้เฉพาะ admin (ลิงก์ใน sidebar แสดงเมื่อเป็น admin),
+  ป้าย "ถูกผู้ดูแลระงับ" ในหน้าแมวของฉัน
+- **soft cap:** รายงานที่เปิดค้างต่อผู้ใช้ไม่เกิน 20 รายการ (กันสแปมรายงาน)
+
+### หลักฐาน
+
+- `npm test` **233 ผ่าน** (เพิ่ม 15: `src/server/moderation/actions.test.ts`), `typecheck`/`lint`/`build` ผ่าน
+- `npm run test:db` (live Supabase, opt-in `MEOWMATCH_LIVE_DB=qgkajyuoaffydydqbouv`) **22 ผ่าน**
+  (รวม moderation live 12 ข้อ): กันยกระดับ role, is_admin, ห้ามรายงานแมวตัวเอง/สวมสิทธิ์,
+  กันรายงานซ้ำ (23505), สมาชิกเห็นเฉพาะรายงานตัวเอง, สมาชิก resolve ไม่ได้ (42501),
+  admin hide → actioned+hidden+audit, แมว hidden มองไม่เห็นข้ามผู้ใช้/anon แต่เจ้าของ+admin เห็น,
+  audit เห็นเฉพาะ admin, unhide คืนการแสดง
+- **Security advisors** (หลัง apply): ไม่มี finding ระดับ ERROR
+  - WARN ใหม่จาก SAFE-01: `is_admin()` และ `resolve_report()` เป็น SECURITY DEFINER ที่ authenticated เรียกได้ —
+    **ตั้งใจ** (is_admin อ่าน role ข้าม RLS; resolve_report ตรวจ `is_admin()` ภายในก่อนทุกการแก้) แนวเดียวกับ `username_available`
+  - WARN/INFO เดิมคงอยู่: citext in public, leaked-password protection ปิด, `analysis_runs` RLS-no-policy (ตั้งใจ, เขียนผ่าน RPC)
+
+### ยังเปิด / ขอบเขต
+
+- ยังไม่มี E2E ของเส้นทางรายงาน (รวมใน QA-01)
+- ไม่มี auto-moderation/ML — รายงานเข้าคิวให้ผู้ดูแลตัดสินด้วยมือ (ตามขอบเขต MVP)
+- การแต่งตั้ง admin ทำด้วย SQL/service-role (ไม่มี UI) — ตามข้อกำหนด PRD "ตั้งจากฝั่งระบบเท่านั้น"

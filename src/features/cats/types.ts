@@ -17,6 +17,8 @@ export type CatView = {
   liked?: boolean;
   /** true = เผยแพร่ในหน้าหาคู่; false = เจ้าของซ่อนไว้ (ใช้ในหน้า "แมวของฉัน") */
   isPublic?: boolean;
+  /** "hidden" = ผู้ดูแลระงับการแสดง (SAFE-01); เจ้าของยังเห็นในแมวของฉัน */
+  moderationStatus?: "active" | "hidden";
   /** รูปใน public/ หรือ URL จาก Supabase Storage (ภายหลัง) */
   photo?: string;
 };

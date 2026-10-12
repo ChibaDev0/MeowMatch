@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { CatThumb } from "@/components/ui/cat-thumb";
 import { HeartIcon } from "@/components/ui/icons";
 import type { CatView } from "@/features/cats/types";
+import { ReportButton } from "@/features/moderation/report-button";
 import { toggleLikeAction } from "@/server/cats/actions";
 
 /**
@@ -38,6 +39,7 @@ export function DiscoverCard({ cat, seed }: { cat: CatView; seed: number }) {
           className="aspect-square w-full"
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
+        <ReportButton catId={cat.id} catName={cat.name} />
         <button
           type="button"
           onClick={onToggle}

@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
+import { ShieldIcon } from "@/components/ui/icons";
 import { NAV_ITEMS } from "./nav-items";
 
 /** Sidebar สำหรับเดสก์ท็อป (ซ่อนบนมือถือ — ใช้ BottomNav แทน) */
-export function Sidebar() {
+export function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname();
+  const items = isAdmin
+    ? [...NAV_ITEMS, { href: "/admin/reports", label: "ศูนย์ดูแลชุมชน", icon: ShieldIcon }]
+    : NAV_ITEMS;
 
   return (
     <aside
@@ -18,7 +22,7 @@ export function Sidebar() {
         <Logo />
       </Link>
       <nav className="flex flex-col gap-1">
-        {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+        {items.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
