@@ -62,7 +62,7 @@ export function ReportButton({ catId, catName }: { catId: string; catName: strin
           aria-modal="true"
           aria-label={`รายงานแมว ${catName}`}
         >
-          <div className="w-full max-w-md space-y-4 rounded-2xl border border-line bg-surface p-6 shadow-xl">
+          <div className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-2xl border border-line bg-surface p-6 shadow-xl">
             {done ? (
               <div className="space-y-4">
                 <div className="space-y-1">

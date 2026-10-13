@@ -13,6 +13,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // viewport-fit=cover เปิดใช้ env(safe-area-inset-*) เพื่อเลี่ยงรอยบาก/แถบ home indicator บน iOS/Android
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
