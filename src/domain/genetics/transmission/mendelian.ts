@@ -48,3 +48,44 @@ export function offspringGenotypes(
   }
   return out;
 }
+
+/** แยก genotype key (เช่น "A/a") กลับเป็นคู่ allele — ใช้เมื่อแปลงผ่าน phenotype rules */
+export function parseGenotypeKey(key: string): Genotype {
+  const parts = key.split("/");
+  return [parts[0] ?? "", parts[1] ?? ""] as const;
+}
+
+/**
+ * โอกาสพบลักษณะเป้าหมายอย่างน้อยหนึ่งตัวในลูก n ตัว เมื่อโอกาสต่อลูกหนึ่งตัว = p
+ * สูตร 1 − (1 − p)^n (MeowMatch/07-genetics-engine §"ต้องผสมกี่ครั้ง")
+ * ⚠️ สมมติผลลูกแต่ละตัวเป็นอิสระและ p คงที่ — ใช้เฉพาะเมื่อ "ทราบ genotype พ่อแม่แน่นอน"
+ *    กรณี genotype พ่อแม่ไม่ทราบต้องรวมผ่าน joint posterior ไม่เอา marginal p มาแทนตรงๆ
+ */
+export function atLeastOneInLitter(p: number, n: number): number {
+  if (!Number.isFinite(p) || p < 0 || p > 1) throw new RangeError("p ต้องเป็นจำนวนจริงใน [0,1]");
+  if (!Number.isSafeInteger(n) || n < 0) throw new RangeError("n ต้องเป็นจำนวนเต็มที่แทนค่าได้แน่นอน ≥ 0");
+  if (n === 0) return 0;
+  // 1 − (1 − p)^n = −expm1(n · log1p(−p)) — ลด floating-point cancellation เมื่อ p เล็กมาก
+  // (เช่น p = 1e-20 ซึ่ง 1 − p ปัดเป็น 1 แล้วได้ 0 ผิด)
+  return -Math.expm1(n * Math.log1p(-p));
+}
+
+/**
+ * จำนวนลูกเชิงคณิตศาสตร์ที่ทำให้โอกาสพบเป้าหมายอย่างน้อยหนึ่งตัว ≥ q
+ * สูตร ceil(log(1−q) / log(1−p)) เฉพาะ 0 < p < 1 และ 0 < q < 1
+ * (MeowMatch/07-genetics-engine) — เป็นคำอธิบายเชิงคณิต ไม่ใช่คำสั่งให้ผสมจริง
+ *   p = 0 → ไม่มีวันถึงเป้าหมาย (คืน null); p ≥ 1 → ถึงแล้วตั้งแต่ตัวแรก (คืน 1)
+ */
+export function littersForTargetProbability(p: number, q: number): number | null {
+  if (!Number.isFinite(p) || p < 0 || p > 1) throw new RangeError("p ต้องเป็นจำนวนจริงใน [0,1]");
+  if (!Number.isFinite(q)) throw new RangeError("q ต้องเป็นจำนวนจริง");
+  if (q <= 0) return 0;
+  if (q >= 1) throw new RangeError("q ต้องน้อยกว่า 1 (ความแน่นอน 100% ไม่การันตีได้)");
+  if (p <= 0) return null; // p = 0 ไม่มีวันถึงเป้าหมาย
+  if (p >= 1) return 1; // p = 1 ถึงตั้งแต่ตัวแรกตามสมมติฐาน
+  const count = Math.ceil(Math.log1p(-q) / Math.log1p(-p));
+  if (!Number.isSafeInteger(count)) {
+    throw new RangeError("จำนวนลูกเกินขอบเขตจำนวนเต็มที่ระบบแทนค่าได้แน่นอน");
+  }
+  return count;
+}

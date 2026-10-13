@@ -45,6 +45,9 @@
 
 html {
   color-scheme: light;
+  /* กันข้อความถูกขยายเองเมื่อหมุนจอบน iOS/Android */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -52,6 +55,29 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  /* กันการเลื่อนแนวนอนโดยไม่ตั้งใจบนจอแคบ */
+  overflow-x: hidden;
+}
+
+/* ปิดไฮไลต์สีเทาตอนแตะปุ่ม/ลิงก์บนมือถือให้ดูเป็นแอปมากขึ้น */
+a,
+button,
+[role="button"],
+label,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * iOS Safari จะซูมหน้าจออัตโนมัติเมื่อโฟกัสช่องกรอกที่มีฟอนต์เล็กกว่า 16px
+ * บังคับ 16px เฉพาะอุปกรณ์สัมผัส (มือถือ/แท็บเล็ต) เพื่อไม่ให้ซูม โดยไม่กระทบเดสก์ท็อป
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* ซ่อน scrollbar ของ sidebar แต่ยังเลื่อนได้ */
@@ -61,4 +87,13 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* เผื่อระยะขอบปลอดภัย (รอยบาก/แถบ home indicator) ให้แถบนำทางล่างและเนื้อหา */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.px-safe {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }

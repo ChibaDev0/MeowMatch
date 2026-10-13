@@ -55,18 +55,23 @@ function makeQuery(result: QueryResult, capture: QueryCapture) {
   return q;
 }
 
+export type RpcCapture = { fn: string; args: unknown };
+
 export type MockClientOptions = {
   /** null = ยังไม่ล็อกอิน; undefined = ใช้ user-1 เป็นค่าเริ่มต้น */
   user?: { id: string } | null;
   /** ผลลัพธ์ของแต่ละ query ตามลำดับการเรียก from() */
   queries?: QueryResult[];
   storage?: { uploadError?: unknown; removeError?: unknown };
+  /** ผลลัพธ์ของ supabase.rpc() — ใช้ค่าเดียวกันกับทุกการเรียก (พอสำหรับ unit test) */
+  rpc?: QueryResult;
 };
 
 export function createSupabaseMock(opts: MockClientOptions = {}) {
   const user = opts.user === undefined ? { id: "user-1" } : opts.user;
   const queries = opts.queries ?? [];
   const captures: QueryCapture[] = [];
+  const rpcCalls: RpcCapture[] = [];
   let index = 0;
 
   const client = {
@@ -80,6 +85,10 @@ export function createSupabaseMock(opts: MockClientOptions = {}) {
       captures.push(capture);
       return makeQuery(result, capture);
     }),
+    rpc: vi.fn(async (fn: string, args: unknown) => {
+      rpcCalls.push({ fn, args });
+      return opts.rpc ?? { data: null, error: null };
+    }),
     storage: {
       from: vi.fn(() => ({
         upload: vi.fn(async () => ({ error: opts.storage?.uploadError ?? null })),
@@ -91,6 +100,7 @@ export function createSupabaseMock(opts: MockClientOptions = {}) {
   return {
     client,
     captures,
+    rpcCalls,
     /** capture ของ query ลำดับที่ i (throw ถ้าไม่มี) — type-safe กว่าการ index ตรง ๆ */
     captureAt(i: number): QueryCapture {
       const c = captures[i];

@@ -1,0 +1,250 @@
+import { describe, expect, it } from "vitest";
+import { analyzePair } from "../pair/analyze";
+import type { AnalysisParent, PairAnalysisInput } from "../contracts/input";
+
+/**
+ * Golden fixtures — พิสูจน์ความถูกต้องของ engine วิเคราะห์คู่ (GEN-02)
+ * ตัวเลขอ้างอิงตารางใน MeowMatch/10-algorithm-design §1 (ตัวอย่างคณิตศาสตร์ ไม่ใช่กฎ FGF5 จริง)
+ */
+
+let parentId = 0;
+function parent(over: Partial<AnalysisParent>): AnalysisParent {
+  return {
+    catId: over.catId ?? `parent-${++parentId}`,
+    name: over.name ?? "แมว",
+    sex: over.sex ?? "unknown",
+    phenotype: over.phenotype ?? {},
+    genotype: over.genotype,
+  };
+}
+
+const base: Omit<PairAnalysisInput, "a" | "b"> = {
+  categories: ["coat_type"],
+  allowUnverifiedRulesets: true,
+};
+
+describe("analyzePair — gating (ความซื่อสัตย์ของผล)", () => {
+  it("ค่าเริ่มต้น (ไม่เปิดโหมดสาธิต) → unsupported เพราะยังไม่มี ruleset ที่ผ่านตรวจรับ", () => {
+    const res = analyzePair({
+      categories: ["coat_type"],
+      a: parent({ phenotype: { coat_type: "ขนสั้น" } }),
+      b: parent({ phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("unsupported");
+    expect(res.traits[0]!.distribution).toHaveLength(0);
+    expect(res.coverage.complete).toBe(false);
+  });
+
+  it("โหมดสาธิต + รูปลักษณ์ไม่รู้จัก → insufficient_data (ไม่ใช่ unsupported)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนหยิก" } }),
+      b: parent({ phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("insufficient_data");
+  });
+
+  it("โหมดสาธิตมี warning กำกับเสมอว่าไม่ใช่ผลจริง", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนสั้น" } }),
+      b: parent({ phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.warnings.some((w) => w.includes("โหมดสาธิต"))).toBe(true);
+  });
+});
+
+describe("analyzePair — computed (ทราบ genotype แน่นอน)", () => {
+  it("L/l × L/l → ขนสั้น 75%, ขนยาว 25% และผลรวม = 1", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ genotype: { coat_type: ["L", "l"] } }),
+      b: parent({ genotype: { coat_type: ["L", "l"] } }),
+    });
+    const t = res.traits[0]!;
+    expect(t.status).toBe("computed");
+    const byCode = Object.fromEntries(t.distribution.map((d) => [d.outcomeCode, d.probability]));
+    expect(byCode.short).toBeCloseTo(0.75);
+    expect(byCode.long).toBeCloseTo(0.25);
+    const total = t.distribution.reduce((s, d) => s + (d.probability ?? 0), 0);
+    expect(total).toBeCloseTo(1);
+  });
+
+  it("L/L × l/l → ขนสั้น 100% (พาหะทั้งหมด ไม่มีขนยาว)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ genotype: { coat_type: ["L", "L"] } }),
+      b: parent({ genotype: { coat_type: ["l", "l"] } }),
+    });
+    const byCode = Object.fromEntries(
+      res.traits[0]!.distribution.map((d) => [d.outcomeCode, d.probability]),
+    );
+    expect(byCode.short).toBeCloseTo(1);
+    expect(byCode.long).toBeCloseTo(0);
+  });
+});
+
+describe("analyzePair — computed จาก phenotype ล้วน (เส้นทางสาธิตจริง)", () => {
+  it("ขนยาว × ขนยาว → l/l × l/l = ขนยาว 100% (phenotype กำหนด genotype ได้)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนยาว" } }),
+      b: parent({ phenotype: { coat_type: "ขนยาว" } }),
+    });
+    const t = res.traits[0]!;
+    expect(t.status).toBe("computed");
+    const byCode = Object.fromEntries(t.distribution.map((d) => [d.outcomeCode, d.probability]));
+    expect(byCode.long).toBeCloseTo(1);
+    expect(byCode.short).toBeCloseTo(0);
+  });
+});
+
+describe("analyzePair — หลายหมวดพร้อมกัน (flow จริงจากหน้า breeding)", () => {
+  const CATS = ["coat_type", "coat_color", "coat_pattern", "eye_color", "ear_type"] as const;
+
+  it("หมวดที่มีโมเดลทดลองคำนวณได้ ส่วนหมวดที่ยังไม่มีโมเดล → unsupported และ coverage ระบุครบ", () => {
+    const res = analyzePair({
+      categories: CATS,
+      allowUnverifiedRulesets: true,
+      a: parent({
+        phenotype: { coat_type: "ขนสั้น", coat_color: "สีเข้ม", coat_pattern: "ลาย", eye_color: "ตาสีฟ้า", ear_type: "หูตั้ง" },
+      }),
+      b: parent({
+        phenotype: { coat_type: "ขนยาว", coat_color: "สีจาง", coat_pattern: "สีพื้น", eye_color: "ตาสีทอง", ear_type: "หูตั้ง" },
+      }),
+    });
+
+    expect(res.traits).toHaveLength(5);
+    const byCat = Object.fromEntries(res.traits.map((t) => [t.category, t.status]));
+    // 3 หมวดที่มีโมเดลทดลอง → คำนวณเป็นช่วง (ผู้ปกครองรูปลักษณ์ไม่ชัด genotype)
+    expect(byCat.coat_type).toBe("scenario_range");
+    expect(byCat.coat_color).toBe("scenario_range");
+    expect(byCat.coat_pattern).toBe("scenario_range");
+    // หมวดที่ยังไม่มีโมเดล → unsupported
+    expect(byCat.eye_color).toBe("unsupported");
+    expect(byCat.ear_type).toBe("unsupported");
+
+    // coverage: 2 หมวดถูกตัด (unsupported) → ไม่ complete และ omitted ระบุหมวด+สถานะ
+    expect(res.coverage.complete).toBe(false);
+    expect(res.coverage.omitted).toHaveLength(2);
+    expect(res.coverage.omitted).toContain("eye_color: unsupported");
+    expect(res.coverage.omitted).toContain("ear_type: unsupported");
+  });
+});
+
+describe("analyzePair — scenario_range (genotype ไม่แน่นอน ไม่มี prior)", () => {
+  it("ขนสั้น × ขนยาว → ขนยาวอยู่ในช่วง 0–50% (ไม่เฉลี่ยเป็นค่าเดียว)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนสั้น" } }), // {L/L, L/l}
+      b: parent({ phenotype: { coat_type: "ขนยาว" } }), // {l/l}
+    });
+    const t = res.traits[0]!;
+    expect(t.status).toBe("scenario_range");
+    const long = t.distribution.find((d) => d.outcomeCode === "long")!;
+    const short = t.distribution.find((d) => d.outcomeCode === "short")!;
+    expect(long.probability).toBeNull();
+    expect(long.lower).toBeCloseTo(0);
+    expect(long.upper).toBeCloseTo(0.5);
+    expect(short.lower).toBeCloseTo(0.5);
+    expect(short.upper).toBeCloseTo(1);
+  });
+});
+
+describe("analyzePair — ความถูกต้องของหลักฐาน (audit ALG-02/03/04)", () => {
+  it("phenotype ขนยาว แต่ genotype L/L ขัดกัน → conflicting_evidence + coverage ไม่ครบ", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ phenotype: { coat_type: "ขนยาว" }, genotype: { coat_type: ["L", "L"] } }),
+      b: parent({ genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).toBe("conflicting_evidence");
+    expect(res.coverage.complete).toBe(false);
+  });
+
+  it("allele นอกโมเดล (X/X) → ไม่ใช่ computed (insufficient_data)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ genotype: { coat_type: ["X", "X"] } }),
+      b: parent({ genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).not.toBe("computed");
+  });
+
+  it("เพศเดียวกันที่ทราบแน่ → ทุก trait ถูก blocked (hard constraint ร่วมกับ target)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "male", genotype: { coat_type: ["L", "l"] } }),
+      b: parent({ sex: "male", genotype: { coat_type: ["L", "l"] } }),
+    });
+    expect(res.traits[0]!.status).toBe("blocked");
+    expect(res.warnings.some((w) => w.includes("เพศเดียวกัน"))).toBe(true);
+  });
+});
+
+describe("analyzePair — welfare gate", () => {
+  it("หูพับ × หูพับ → ear_type ถูก blocked และมี warning", () => {
+    const res = analyzePair({
+      categories: ["ear_type"],
+      allowUnverifiedRulesets: true,
+      a: parent({ phenotype: { ear_type: "หูพับ" } }),
+      b: parent({ phenotype: { ear_type: "หูพับ" } }),
+    });
+    expect(res.traits[0]!.status).toBe("blocked");
+    expect(res.warnings.some((w) => w.includes("Fold"))).toBe(true);
+  });
+
+  it("หูพับ × หูตั้ง → ระงับตามนโยบายสวัสดิภาพ", () => {
+    const res = analyzePair({
+      categories: ["ear_type"],
+      allowUnverifiedRulesets: true,
+      a: parent({ sex: "female", phenotype: { ear_type: "หูพับ" } }),
+      b: parent({ sex: "male", phenotype: { ear_type: "หูตั้ง" } }),
+    });
+    expect(res.traits[0]!.status).toBe("blocked");
+    expect(res.warnings.some((w) => w.includes("Fold"))).toBe(true);
+    expect(res.warnings.join()).toContain("ไม่ใช่การรับรอง");
+  });
+});
+
+describe("analyzePair — สถานะเพศ (P5-02)", () => {
+  it("เพศไม่ทราบอย่างน้อยหนึ่งตัว → sexCompatibility=unknown + warning (ไม่ block)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "unknown", phenotype: { coat_type: "ขนยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.sexCompatibility).toBe("unknown");
+    expect(res.traits[0]!.status).toBe("computed"); // ยังคำนวณได้ภายใต้สมมติฐาน
+    expect(res.warnings.some((w) => w.includes("เพศ"))).toBe(true);
+  });
+
+  it("เพศครบคนละเพศ → confirmed และไม่มี warning เพศ", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", phenotype: { coat_type: "ขนยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.sexCompatibility).toBe("confirmed");
+  });
+});
+
+describe("analyzePair — runtime validation (P5-06)", () => {
+  it("รูปลักษณ์กำกวม 'ไม่ทราบว่าขนสั้นหรือยาว' → insufficient_data (ไม่เดาข้างใดข้างหนึ่ง)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", phenotype: { coat_type: "ไม่ทราบว่าขนสั้นหรือยาว" } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("insufficient_data");
+  });
+
+  it("genotype ความยาวไม่ใช่สองอัลลีล → insufficient_data (ไม่ computed)", () => {
+    const res = analyzePair({
+      ...base,
+      a: parent({ sex: "female", genotype: { coat_type: ["l"] as unknown as [string, string] } }),
+      b: parent({ sex: "male", phenotype: { coat_type: "ขนยาว" } }),
+    });
+    expect(res.traits[0]!.status).toBe("insufficient_data");
+  });
+});

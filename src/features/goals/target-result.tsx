@@ -1,0 +1,122 @@
+import type {
+  RankedCandidate,
+  TargetSearchResult,
+  TraitOutcomeStatus,
+} from "@/domain/genetics/contracts/types";
+import type { CandidatePoolInfo } from "@/server/analysis/target-actions";
+
+/**
+ * แสดงผลการค้นหาคู่ตามเป้าหมาย (TARGET-01) — จัดอันดับแบบแยกกลุ่มที่อธิบายได้
+ * - computed → แสดง % ลูกตรงเป้าหมายทั้งหมด
+ * - scenario_range → แสดงช่วง (ไม่ใช่ค่าเดียว)
+ * - unsupported → ยังคำนวณครบเป้าหมายไม่ได้ (บอกเหตุผล ไม่เติมตัวเลข)
+ */
+
+const STATUS_META: Record<TraitOutcomeStatus, { label: string; cls: string }> = {
+  computed: { label: "คำนวณแล้ว", cls: "bg-green-100 text-green-800" },
+  estimated: { label: "ประมาณจาก prior", cls: "bg-blue-100 text-blue-800" },
+  scenario_range: { label: "ช่วงที่เป็นไปได้", cls: "bg-blue-100 text-blue-800" },
+  insufficient_data: { label: "ข้อมูลไม่พอ", cls: "bg-slate-100 text-slate-700" },
+  unsupported: { label: "ยังคำนวณครบไม่ได้", cls: "bg-slate-100 text-slate-700" },
+  conflicting_evidence: { label: "หลักฐานขัดกัน", cls: "bg-red-100 text-red-800" },
+  blocked: { label: "ระงับ (สวัสดิภาพ)", cls: "bg-red-100 text-red-800" },
+  budget_exceeded: { label: "เกิน budget", cls: "bg-amber-100 text-amber-900" },
+};
+
+const pct = (p: number) => `${(p * 100).toFixed(p * 100 < 10 ? 1 : 0)}%`;
+
+function scoreText(c: RankedCandidate): string {
+  if (c.status === "computed" && c.targetProbability != null) return pct(c.targetProbability);
+  if (c.status === "scenario_range") return `${pct(c.lower ?? 0)} – ${pct(c.upper ?? 0)}`;
+  return "—";
+}
+
+function CandidateRow({ cand, rank }: { cand: RankedCandidate; rank?: number }) {
+  const meta = STATUS_META[cand.status];
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface p-4">
+      <div className="flex items-center gap-3">
+        {rank !== undefined && <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
+          {rank}
+        </span>}
+        <div className="space-y-1">
+          <p className="font-medium text-ink">{cand.candidateName}</p>
+          <div className="flex flex-wrap gap-1">
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${meta.cls}`}>
+              {meta.label}
+            </span>
+            {cand.sexCompatibility === "unknown" && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                เพศยังไม่ยืนยัน
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-lg font-semibold text-ink">{scoreText(cand)}</p>
+        <p className="text-xs text-muted">ข้อมูลครบ {pct(cand.completeness)}</p>
+      </div>
+    </li>
+  );
+}
+
+export function TargetResultView({
+  result,
+  pool,
+}: {
+  result: TargetSearchResult;
+  pool?: CandidatePoolInfo;
+}) {
+  // Stored v1 results may still contain unknown-sex candidates in the ranked list.
+  const ranked = result.candidates.filter((c) => c.sexCompatibility === "confirmed");
+  const pending = [...(result.pendingCandidates ?? []), ...result.candidates.filter((c) => c.sexCompatibility === "unknown")];
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-line bg-primary-50/50 p-3 text-xs text-muted">
+        ค้นจาก <span className="font-medium text-ink">แมวที่คุณกดใจไว้</span>{" "}
+        {pool ? `(${pool.fetched} ตัว)` : ""} เท่านั้น — ไม่ใช่แมวทุกตัวในระบบ
+        {pool?.source === "demo" && " · กำลังใช้ข้อมูลสาธิต (ยังไม่เชื่อมฐานข้อมูลจริง)"}
+        {pool && !pool.complete && " · ⚠️ ดึงรายชื่อได้ไม่ครบ ผลอาจไม่ครบถ้วน"}
+      </div>
+
+      {result.warnings.length > 0 && (
+        <div className="space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {result.warnings.map((w, i) => (
+            <p key={i}>⚠️ {w}</p>
+          ))}
+        </div>
+      )}
+
+      {ranked.length === 0 ? (
+        <p className="rounded-xl border border-line bg-surface p-4 text-sm text-muted">
+          ไม่มีรายการในอันดับคำนวณ (ประเมิน {result.evaluatedCount} ตัว) โปรดตรวจข้อจำกัดและรายการรอยืนยันด้านล่าง
+        </p>
+      ) : (
+        <ol aria-label="อันดับคำนวณตามโมเดล" className="space-y-2">
+          {ranked.map((c, i) => (
+            <CandidateRow key={c.candidateCatId} cand={c} rank={i + 1} />
+          ))}
+        </ol>
+      )}
+
+      {pending.length > 0 && (
+        <section aria-label="รอยืนยันเพศ" className="space-y-2">
+          <h3 className="font-semibold text-ink">รอยืนยันเพศ — ยังไม่จัดเป็นคู่แนะนำ</h3>
+          <p className="text-sm text-muted">ตัวเลขเป็นผลภายใต้สมมติฐาน รายการนี้ไม่มีอันดับ</p>
+          <ul className="space-y-2">
+            {pending.map((c) => <CandidateRow key={c.candidateCatId} cand={c} />)}
+          </ul>
+        </section>
+      )}
+
+      <p className="text-xs text-muted">
+        ประเมิน {result.evaluatedCount} ตัว · เข้าเกณฑ์จัดอันดับคำนวณ {result.eligibleCount} ตัว
+        {` · รอยืนยันเพศ ${pending.length} ตัว`}
+        {result.coverage.omitted.length > 0 &&
+          ` · ตัดด้วยเงื่อนไข ${result.coverage.omitted.length} ตัว`}{" "}
+        · อันดับนี้หมายถึงเฉพาะรายการที่ประเมินแล้ว · engine v{result.versions.engineVersion}
+      </p>
+    </div>
+  );
+}

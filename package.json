@@ -13,8 +13,13 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:gemini:live": "vitest run --config vitest.gemini-live.config.ts",
+    "test:pair:e2e": "playwright test --config playwright.pair-live.config.ts",
+    "benchmark:genetics": "vitest run --config vitest.benchmark.config.ts",
+    "test:db": "vitest run --config vitest.live-db.config.ts",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "load": "node scripts/load/run.mjs",
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
     "format": "prettier --write ."
   },
@@ -29,6 +34,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.1",
     "@playwright/test": "^1.48.0",
     "@tailwindcss/postcss": "^4.0.0",
     "@testing-library/jest-dom": "^6.5.0",
@@ -37,6 +43,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.2",
+    "autocannon": "^7.15.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.1.0",
     "jsdom": "^25.0.1",

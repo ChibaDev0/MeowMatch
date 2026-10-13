@@ -34,11 +34,14 @@ function toView(row: CatRow, liked = false): CatView {
     ageLabel: ageLabel(row.age_months),
     breed: row.breed ?? "ไม่ทราบสายพันธุ์",
     coat: row.coat ?? "—",
+    coatColor: row.coat_color ?? "",
+    coatPattern: row.coat_pattern ?? "",
     eye: row.eye_color ?? "—",
     ear: row.ear_type ?? "—",
     sex: row.sex,
     liked,
     isPublic: row.is_public,
+    moderationStatus: row.moderation_status ?? "active",
     photo: catPhotoSrc(row.photo_path),
   };
 }
@@ -78,6 +81,8 @@ export async function getCatForEdit(id: string): Promise<CatEditData | null> {
     ageYears: age.years,
     ageMonths: age.months,
     coat: data.coat,
+    coatColor: data.coat_color ?? "",
+    coatPattern: data.coat_pattern ?? "",
     eyeColor: data.eye_color ?? "",
     earType: data.ear_type ?? "",
     temperament: data.temperament ?? "",
@@ -244,6 +249,111 @@ export async function getLikedCats(): Promise<CatView[]> {
     .map((id) => byId.get(id))
     .filter((c): c is CatRow => c != null)
     .map((row) => toView(row, true));
+}
+
+/**
+ * ชุดผู้สมัครสำหรับการวิเคราะห์ตามเป้าหมาย (P5-01) — แยก "ดึงครบ/ผิดพลาด/สาธิต" ให้ชัด
+ * ไม่แปลง error เป็นผลว่าง และไม่แอบใช้ demo เป็นผลจากฐานข้อมูลจริง
+ */
+export type CandidateSource = "real" | "demo";
+export type CandidatePool = {
+  cats: CatView[];
+  source: CandidateSource;
+  /** true = ดึง pool ครบโดยไม่มี error/ค้างกลางทาง (ใช้ตั้ง searchComplete ของ engine) */
+  complete: boolean;
+  /** ข้อความ error ที่แยกจาก "ไม่มีข้อมูล" (empty state) */
+  error: string | null;
+  /** จำนวน like ที่ดึงได้จริง */
+  fetched: number;
+  /** จำนวน like ที่คาด (count จาก DB) — null = ไม่ทราบ */
+  expected: number | null;
+};
+
+const ANALYSIS_PAGE_SIZE = 50;
+const ANALYSIS_MAX_PAGES = 200; // กันลูปไม่รู้จบหากข้อมูลเปลี่ยนระหว่างหน้า
+
+/**
+ * ดึงแมวที่ผู้ใช้กดใจไว้เป็น "ชุดผู้สมัคร" สำหรับโหมดค้นหาตามเป้าหมาย (TARGET-01)
+ * - แบ่งหน้าแบบลำดับเสถียร (created_at desc, cat_id asc) และใช้ count เพื่อรู้ว่าครบหรือยัง
+ * - error กลางทาง → complete=false + error (ไม่คืน [] เงียบ ๆ ว่าสำเร็จ)
+ * - ยังไม่ migrate (missing schema) → demo พร้อม source="demo" ที่มี provenance ชัดเจน
+ */
+export async function getAnalysisCandidates(excludeCatId?: string): Promise<CandidatePool> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { cats: [], source: "real", complete: true, error: null, fetched: 0, expected: 0 };
+
+  const likeIds: string[] = [];
+  let expected: number | null = null;
+  let complete = true;
+  let error: string | null = null;
+
+  for (let page = 0; page < ANALYSIS_MAX_PAGES; page++) {
+    const from = page * ANALYSIS_PAGE_SIZE;
+    const to = from + ANALYSIS_PAGE_SIZE - 1;
+    const {
+      data,
+      error: qErr,
+      count,
+    } = await supabase
+      .from("cat_likes")
+      .select("cat_id, created_at", { count: "exact" })
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .order("cat_id", { ascending: true })
+      .range(from, to);
+
+    if (qErr) {
+      if (page === 0 && isMissingSchema(qErr)) {
+        const demo = DEMO_DISCOVER_CATS.filter((c) => c.id !== excludeCatId);
+        return {
+          cats: demo,
+          source: "demo",
+          complete: true,
+          error: null,
+          fetched: demo.length,
+          expected: demo.length,
+        };
+      }
+      complete = false;
+      error = "ดึงรายการแมวที่กดใจไม่สำเร็จครบทุกหน้า — ผลอาจไม่ครบ";
+      break;
+    }
+
+    if (page === 0) expected = count ?? null;
+    const rows = (data ?? []) as Array<{ cat_id: string }>;
+    for (const r of rows) likeIds.push(r.cat_id);
+    if (rows.length < ANALYSIS_PAGE_SIZE) break; // หน้าสุดท้าย
+    if (expected != null && likeIds.length >= expected) break;
+  }
+
+  const ids = likeIds.filter((id) => id !== excludeCatId);
+  if (ids.length === 0) {
+    return { cats: [], source: "real", complete, error, fetched: likeIds.length, expected };
+  }
+
+  const { data: cats, error: catsErr } = await supabase.from("cats").select("*").in("id", ids);
+  if (catsErr) {
+    return {
+      cats: [],
+      source: "real",
+      complete: false,
+      error: "ดึงข้อมูลแมวผู้สมัครไม่สำเร็จ",
+      fetched: likeIds.length,
+      expected,
+    };
+  }
+
+  // คงลำดับตาม like (บางตัวอาจถูกซ่อน/RLS → หายไปได้ ถือว่าปกติ ไม่ใช่ error)
+  const byId = new Map((cats ?? []).map((c) => [c.id, c]));
+  const ordered = ids
+    .map((id) => byId.get(id))
+    .filter((c): c is CatRow => c != null)
+    .map((row) => toView(row, true));
+
+  return { cats: ordered, source: "real", complete, error, fetched: likeIds.length, expected };
 }
 
 export type ProfileStats = { myCats: number; liked: number; breeding: number };

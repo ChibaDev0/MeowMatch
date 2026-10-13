@@ -6,6 +6,9 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingIncludes: {
+    "/*": ["./docs/ai/gemini-flash.md", "./docs/ai/pair-appearance.md", "./docs/scope.md"],
+  },
   // Server Actions รับ FormData ที่มีไฟล์รูป — ขยายลิมิต body จากค่าเริ่มต้น 1MB
   // ให้พอกับรูปสูงสุด 5MB (MAX_PHOTO_BYTES) + overhead ของฟิลด์อื่นและ multipart encoding
   experimental: {

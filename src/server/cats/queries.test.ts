@@ -4,6 +4,7 @@ import { createSupabaseMock, hasEq, type QueryResult } from "@/test/supabase-moc
 import {
   ageLabel,
   applyDemoFilters,
+  getAnalysisCandidates,
   getCatForEdit,
   getDiscoverCats,
   getMyCats,
@@ -163,5 +164,111 @@ describe("getCatForEdit (ownership guard)", () => {
     expect(res).toMatchObject({ id: "cat-1", name: "โมจิ", ageYears: 1, ageMonths: 2 });
     expect(hasEq(mock.captureAt(0), "owner_id", "user-1")).toBe(true);
     expect(hasEq(mock.captureAt(0), "id", "cat-1")).toBe(true);
+  });
+});
+
+/**
+ * P5-01 — getAnalysisCandidates: ดึง pool ครบ, แยก error จาก empty, และ provenance (real/demo)
+ */
+type LikeRow = { cat_id: string; created_at: string };
+const likeRows = (n: number, start = 0): LikeRow[] =>
+  Array.from({ length: n }, (_, i) => ({ cat_id: `c${start + i}`, created_at: "2026-01-01" }));
+const catRowsFor = (ids: string[]) =>
+  ids.map((id) => ({
+    id,
+    name: id,
+    age_months: 12,
+    breed: "ผสม",
+    coat: "ขนยาว",
+    eye_color: "ตาสีฟ้า",
+    ear_type: "หูตั้ง",
+    sex: "male",
+    is_public: true,
+    photo_path: null,
+  }));
+
+describe("getAnalysisCandidates (P5-01)", () => {
+  it("ไม่มี like เลย → cats ว่าง, complete=true, ไม่มี error (empty ไม่ใช่ error)", async () => {
+    mockClient({ queries: [{ data: [], count: 0 }] });
+    const pool = await getAnalysisCandidates();
+    expect(pool.cats).toHaveLength(0);
+    expect(pool.complete).toBe(true);
+    expect(pool.error).toBeNull();
+    expect(pool.source).toBe("real");
+  });
+
+  it("หน้าเดียว (< page size) → ดึงครบและ resolve cats", async () => {
+    const ids = ["c0", "c1"];
+    mockClient({
+      queries: [
+        { data: likeRows(2), count: 2 },
+        { data: catRowsFor(ids) },
+      ],
+    });
+    const pool = await getAnalysisCandidates();
+    expect(pool.complete).toBe(true);
+    expect(pool.cats.map((c) => c.id)).toEqual(ids);
+    expect(pool.fetched).toBe(2);
+    expect(pool.expected).toBe(2);
+  });
+
+  it("หลายหน้า → สะสม like ข้ามหน้าแล้ว resolve cats ครบ", async () => {
+    const page0 = likeRows(50, 0); // เต็มหน้า → อ่านหน้าถัดไป
+    const page1 = likeRows(10, 50); // < page size → หน้าสุดท้าย
+    const allIds = [...page0, ...page1].map((r) => r.cat_id);
+    mockClient({
+      queries: [
+        { data: page0, count: 60 },
+        { data: page1, count: 60 },
+        { data: catRowsFor(allIds) },
+      ],
+    });
+    const pool = await getAnalysisCandidates();
+    expect(pool.complete).toBe(true);
+    expect(pool.fetched).toBe(60);
+    expect(pool.cats).toHaveLength(60);
+  });
+
+  it("ล้มเหลวกลางหน้า (timeout) → complete=false + error (ไม่รายงานว่าครบ)", async () => {
+    mockClient({
+      queries: [
+        { data: likeRows(50, 0), count: 60 },
+        { error: { code: "57014" } }, // statement_timeout
+        { data: catRowsFor(likeRows(50, 0).map((r) => r.cat_id)) },
+      ],
+    });
+    const pool = await getAnalysisCandidates();
+    expect(pool.complete).toBe(false);
+    expect(pool.error).not.toBeNull();
+  });
+
+  it("แมวบางตัวถูกซ่อน (RLS) → หายไปได้ ถือว่าปกติ complete ยัง true", async () => {
+    mockClient({
+      queries: [
+        { data: likeRows(2), count: 2 },
+        { data: catRowsFor(["c0"]) }, // c1 ถูกซ่อน
+      ],
+    });
+    const pool = await getAnalysisCandidates();
+    expect(pool.complete).toBe(true);
+    expect(pool.cats.map((c) => c.id)).toEqual(["c0"]);
+  });
+
+  it("ยังไม่ migrate (missing schema) → demo พร้อม source='demo' (ไม่อ้างว่าเป็นข้อมูลจริง)", async () => {
+    mockClient({ queries: [{ error: { code: "42P01" } }] });
+    const pool = await getAnalysisCandidates();
+    expect(pool.source).toBe("demo");
+    expect(pool.cats.length).toBeGreaterThan(0);
+  });
+
+  it("ตัด excludeCatId (แมวต้นทาง) ออกจากผู้สมัคร", async () => {
+    mockClient({
+      queries: [
+        { data: likeRows(2), count: 2 }, // c0, c1
+        { data: catRowsFor(["c1"]) },
+      ],
+    });
+    const pool = await getAnalysisCandidates("c0");
+    expect(pool.cats.map((c) => c.id)).toEqual(["c1"]);
   });
 });

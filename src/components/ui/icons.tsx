@@ -55,6 +55,24 @@ export function HeartIcon(p: IconProps) {
   );
 }
 
+export function FlagIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M5 21V4" />
+      <path d="M5 4.5h11l-2 3.5 2 3.5H5" />
+    </svg>
+  );
+}
+
+export function ShieldIcon(p: IconProps) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 3 5 6v5.5c0 4.3 2.9 7.4 7 9.5 4.1-2.1 7-5.2 7-9.5V6z" />
+      <path d="m9.5 12 1.8 1.8L15 10.3" />
+    </svg>
+  );
+}
+
 export function SearchIcon(p: IconProps) {
   return (
     <svg {...base} {...p}>

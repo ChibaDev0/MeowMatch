@@ -79,6 +79,8 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
   const [ageYears, setAgeYears] = useState(initial?.ageYears != null ? String(initial.ageYears) : "");
   const [ageMonths, setAgeMonths] = useState(initial?.ageMonths != null ? String(initial.ageMonths) : "");
   const [coat, setCoat] = useState<string | null>(initial?.coat ?? null);
+  const [coatColor, setCoatColor] = useState(initial?.coatColor ?? "");
+  const [coatPattern, setCoatPattern] = useState(initial?.coatPattern ?? "");
   const [eye, setEye] = useState(initial?.eyeColor ?? "");
   const [ear, setEar] = useState(initial?.earType ?? "");
   const [temperament, setTemperament] = useState(initial?.temperament ?? "");
@@ -124,6 +126,8 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
     fd.set("ageYears", ageYears);
     fd.set("ageMonths", ageMonths);
     fd.set("coat", coat ?? "");
+    fd.set("coatColor", coatColor);
+    fd.set("coatPattern", coatPattern);
     fd.set("eyeColor", eye);
     fd.set("earType", ear);
     fd.set("temperament", temperament);
@@ -300,6 +304,20 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
             placeholder="เลือกลักษณะหู"
           />
         </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <label htmlFor="coat-color" className="text-sm font-medium text-ink">สีขน</label>
+            <input id="coat-color" value={coatColor} onChange={(e) => setCoatColor(e.target.value)} maxLength={80} placeholder="เช่น ดำ, ส้ม, เทา, ขาวดำ" className={inputCls} />
+            {fieldErrors.coatColor && <p className="text-xs text-rose-500">{fieldErrors.coatColor}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="coat-pattern" className="text-sm font-medium text-ink">ลวดลายขน</label>
+            <input id="coat-pattern" value={coatPattern} onChange={(e) => setCoatPattern(e.target.value)} maxLength={80} placeholder="เช่น สีพื้น, ลายสลิด, แต้มขาว, สามสี" className={inputCls} />
+            {fieldErrors.coatPattern && <p className="text-xs text-rose-500">{fieldErrors.coatPattern}</p>}
+          </div>
+        </div>
+        <p className="text-xs text-muted">สีและลายขนใช้ประกอบการวิเคราะห์ลูกแมว หากไม่ทราบให้เว้นว่าง</p>
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-ink">ลักษณะนิสัย</label>

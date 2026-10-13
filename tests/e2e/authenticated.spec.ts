@@ -39,4 +39,30 @@ test.describe("พื้นที่สมาชิก (authenticated)", () => {
     await expect(page).toHaveURL(/\/my-cats$/);
     await expect(page.getByText(name)).toBeVisible();
   });
+
+  // ===== SAFE-01: รายงาน + สิทธิ์ผู้ดูแล =====
+  test("รายงานแมวในหน้าหาคู่ได้ (SAFE-01)", async ({ page }) => {
+    await page.goto("/discover");
+    const reportBtn = page.getByRole("button", { name: /^รายงาน/ }).first();
+    await expect(reportBtn).toBeVisible();
+    await reportBtn.click();
+
+    const dialog = page.getByRole("dialog", { name: /รายงานแมว/ });
+    await expect(dialog).toBeVisible();
+    await dialog.getByText("เนื้อหาไม่เหมาะสม").click();
+    await dialog.getByRole("button", { name: "ส่งรายงาน" }).click();
+
+    await expect(page.getByText("ส่งรายงานแล้ว")).toBeVisible();
+  });
+
+  test("สมาชิกทั่วไปเข้าหน้าผู้ดูแลไม่ได้ (เด้ง /home)", async ({ page }) => {
+    await page.goto("/admin/reports");
+    await expect(page).toHaveURL(/\/home$/);
+  });
+
+  test("สมาชิกทั่วไปไม่เห็นลิงก์ศูนย์ดูแลชุมชนใน sidebar", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/home");
+    await expect(page.getByTestId("sidebar").getByText("ศูนย์ดูแลชุมชน")).toHaveCount(0);
+  });
 });
