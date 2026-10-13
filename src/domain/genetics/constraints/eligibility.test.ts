@@ -72,6 +72,6 @@ describe("shared conservative pair policy", () => {
   it("still gates real rules and preserves null for unsupported pending results", () => {
     const result = analyzeTarget({ source: cat("a"), candidates: [cat("b", { sex: "unknown" })], targets: { coat_type: "long" } });
     expect(result.pendingCandidates[0]).toMatchObject({ status: "unsupported", targetProbability: null });
-    expect(result.versions).toMatchObject({ engineVersion: "0.2.0", resultSchemaVersion: "2", rulesetVersion: "0.1.0-demo" });
+    expect(result.versions).toMatchObject({ engineVersion: "0.2.0", resultSchemaVersion: "2", rulesetVersion: "0.2.0-demo" });
   });
 });

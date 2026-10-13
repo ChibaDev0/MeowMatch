@@ -44,6 +44,16 @@ beforeEach(() => {
  * server เป็นผู้ตัดสินเสมอ: ตรวจ input, ต้องล็อกอิน, และ scope ด้วย owner_id (RLS อีกชั้น)
  */
 describe("createCatAction", () => {
+  it("saves color and pattern separately from coat length", async () => {
+    const mock = mockClient({ queries: [OK] });
+    expect((await createCatAction(form({ name: "สีทดสอบ", coat: "ขนสั้น", coatColor: "ดำ", coatPattern: "สีพื้น" }))).ok).toBe(true);
+    expect(mock.captureAt(0).payload).toMatchObject({ coat: "ขนสั้น", coat_color: "ดำ", coat_pattern: "สีพื้น" });
+  });
+  it("rejects overlong color before accessing the database", async () => {
+    const res = await createCatAction(form({ name: "สีทดสอบ", coat: "ขนสั้น", coatColor: "ก".repeat(81) }));
+    expect(res.ok).toBe(false);
+    expect(createClient).not.toHaveBeenCalled();
+  });
   it("ปฏิเสธเมื่อไม่กรอกชื่อ (fieldErrors.name)", async () => {
     mockClient();
     const res = await createCatAction(form({ coat: "ขนสั้น" }));
@@ -81,6 +91,12 @@ describe("createCatAction", () => {
 });
 
 describe("updateCatAction (ownership guard)", () => {
+  it("does not erase colors from older forms that omit the new fields", async () => {
+    const mock = mockClient({ queries: [{ data: { photo_path: null } }, OK] });
+    expect((await updateCatAction(form({ id: CAT_ID, name: "แมว", coat: "ขนยาว" }))).ok).toBe(true);
+    expect(mock.captureAt(1).payload).not.toHaveProperty("coat_color");
+    expect(mock.captureAt(1).payload).not.toHaveProperty("coat_pattern");
+  });
   it("ปฏิเสธเมื่อ id ไม่ใช่ uuid", async () => {
     mockClient();
     const res = await updateCatAction(form({ id: "not-uuid", name: "x", coat: "ขนสั้น" }));

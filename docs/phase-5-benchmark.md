@@ -48,6 +48,6 @@ Pair exact p95 = 0.004275 ms, pair scenario = 0.013761 ms และ scenario fun
 
 รายงานนี้ทำส่วน benchmark ของ P5-07 ไม่ปิด P5-07 ทั้งรายการ ยังต้องออกแบบ/ทดสอบ runtime budget, cancellation, พฤติกรรม ณ limit/เกิน limit และแยก pool/evaluation/model/evidence completeness ใน contract การกรอง hard constraints ต้องไม่ถูกตีความว่าค้นหาไม่ครบ และช่วงจาก scenario ที่แจกแจงไม่ครบต้องไม่แสดงเสมือนเป็นช่วงครบ
 
-ยังไม่ได้วัด DB/network/auth, history persistence/snapshot จริง, browser, cold start, heap peak หรือหลายผู้ใช้พร้อมกัน ข้อมูลทดสอบนี้ไม่ใช่ candidate pool จริง ผลเร็วของ default gate ไม่ใช่ความเร็วของกฎจริงที่ผู้เชี่ยวชาญรับรอง และไม่ได้เปลี่ยน `verified=false` หรือเปิด history
+ยังไม่ได้วัด DB/network/auth, history persistence/snapshot จริง, browser, cold start, heap peak หรือหลายผู้ใช้พร้อมกัน ข้อมูลทดสอบนี้ไม่ใช่ candidate pool จริง ตัวเลขเป็นการวัดโมเดลทดลอง ไม่ใช่ผลจริงสำหรับแมว
 
-RES-01 และ P5-08 ยังคงเป็นเกณฑ์แยกตาม [งานคงเหลือ Phase 5](phase-5-remaining-work.md)
+P5-08 (E2E) ยังเป็นเกณฑ์แยกตาม [งานคงเหลือ Phase 5](phase-5-remaining-work.md) · งานที่ผูกกับ DNA/ผู้เชี่ยวชาญถูกตัดออกแล้ว (ดู [scope.md](scope.md))

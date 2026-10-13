@@ -102,26 +102,33 @@ describe("analyzePair — computed จาก phenotype ล้วน (เส้�
 describe("analyzePair — หลายหมวดพร้อมกัน (flow จริงจากหน้า breeding)", () => {
   const CATS = ["coat_type", "coat_color", "coat_pattern", "eye_color", "ear_type"] as const;
 
-  it("มี ruleset เฉพาะ coat_type → หมวดอื่น unsupported และ coverage ระบุครบ", () => {
+  it("หมวดที่มีโมเดลทดลองคำนวณได้ ส่วนหมวดที่ยังไม่มีโมเดล → unsupported และ coverage ระบุครบ", () => {
     const res = analyzePair({
       categories: CATS,
       allowUnverifiedRulesets: true,
-      a: parent({ phenotype: { coat_type: "ขนสั้น", eye_color: "ตาสีฟ้า", ear_type: "หูตั้ง" } }),
-      b: parent({ phenotype: { coat_type: "ขนยาว", eye_color: "ตาสีทอง", ear_type: "หูตั้ง" } }),
+      a: parent({
+        phenotype: { coat_type: "ขนสั้น", coat_color: "สีเข้ม", coat_pattern: "ลาย", eye_color: "ตาสีฟ้า", ear_type: "หูตั้ง" },
+      }),
+      b: parent({
+        phenotype: { coat_type: "ขนยาว", coat_color: "สีจาง", coat_pattern: "สีพื้น", eye_color: "ตาสีทอง", ear_type: "หูตั้ง" },
+      }),
     });
 
     expect(res.traits).toHaveLength(5);
     const byCat = Object.fromEntries(res.traits.map((t) => [t.category, t.status]));
+    // 3 หมวดที่มีโมเดลทดลอง → คำนวณเป็นช่วง (ผู้ปกครองรูปลักษณ์ไม่ชัด genotype)
     expect(byCat.coat_type).toBe("scenario_range");
-    expect(byCat.coat_color).toBe("unsupported");
-    expect(byCat.coat_pattern).toBe("unsupported");
+    expect(byCat.coat_color).toBe("scenario_range");
+    expect(byCat.coat_pattern).toBe("scenario_range");
+    // หมวดที่ยังไม่มีโมเดล → unsupported
     expect(byCat.eye_color).toBe("unsupported");
     expect(byCat.ear_type).toBe("unsupported");
 
-    // coverage: 4 หมวดถูกตัด (unsupported) → ไม่ complete และ omitted ระบุหมวด+สถานะ
+    // coverage: 2 หมวดถูกตัด (unsupported) → ไม่ complete และ omitted ระบุหมวด+สถานะ
     expect(res.coverage.complete).toBe(false);
-    expect(res.coverage.omitted).toHaveLength(4);
+    expect(res.coverage.omitted).toHaveLength(2);
     expect(res.coverage.omitted).toContain("eye_color: unsupported");
+    expect(res.coverage.omitted).toContain("ear_type: unsupported");
   });
 });
 

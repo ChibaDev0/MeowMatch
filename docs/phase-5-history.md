@@ -57,4 +57,4 @@ Source artifact ไม่ใช่ executable sandbox/ตัวติดตั�
 7. เพิ่ม UI เก็บ idempotency key/runId และเปิดผลหลัง refresh พร้อมป้าย saved/disabled/demo/error; รัน E2E ทั้งสองโหมดบนแอป+DB จริง (P5-08)
 8. วัดขนาด snapshot/เวลา/limits บน candidate pool จริงก่อนเปิดใช้ (P5-07) ไม่ตั้งเพดานโดยเดา
 
-รายการผู้เชี่ยวชาญแยกอยู่ใน [phase-5-expert-review.md](phase-5-expert-review.md) และส่งต่อไปแชท “ตรวจสอบและทดสอบ Algorithm” แล้ว ไม่มีการรับรองแทนผู้เชี่ยวชาญในรอบนี้
+หมายเหตุขอบเขต (2026-10-13): งาน consent/สิทธิ์ DNA และการตรวจรับของผู้เชี่ยวชาญถูกตัดออกจากโปรเจกต์แล้ว (ดู [scope.md](scope.md)) — ส่วนประวัติ/replay นี้ยังใช้ได้ในฐานะฟีเจอร์ของแอป โดยไม่มีข้อผูกเรื่อง DNA

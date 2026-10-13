@@ -35,6 +35,8 @@ export type CatRow = {
   sex: CatSexDb;
   age_months: number | null;
   coat: string | null;
+  coat_color?: string | null;
+  coat_pattern?: string | null;
   eye_color: string | null;
   ear_type: string | null;
   temperament: string | null;
@@ -149,6 +151,8 @@ export type Database = {
           sex?: CatSexDb;
           age_months?: number | null;
           coat?: string | null;
+          coat_color?: string | null;
+          coat_pattern?: string | null;
           eye_color?: string | null;
           ear_type?: string | null;
           temperament?: string | null;
@@ -164,6 +168,8 @@ export type Database = {
           sex?: CatSexDb;
           age_months?: number | null;
           coat?: string | null;
+          coat_color?: string | null;
+          coat_pattern?: string | null;
           eye_color?: string | null;
           ear_type?: string | null;
           temperament?: string | null;

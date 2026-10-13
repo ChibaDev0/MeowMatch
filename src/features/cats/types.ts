@@ -11,6 +11,8 @@ export type CatView = {
   ageLabel: string;
   breed: string;
   coat: string;
+  coatColor?: string;
+  coatPattern?: string;
   eye: string;
   ear: string;
   sex: CatSex;
@@ -35,6 +37,8 @@ export type CatEditData = {
   ageYears: number | null;
   ageMonths: number | null;
   coat: string | null;
+  coatColor?: string;
+  coatPattern?: string;
   eyeColor: string;
   earType: string;
   temperament: string;

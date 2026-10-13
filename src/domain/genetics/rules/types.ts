@@ -1,11 +1,11 @@
 /**
- * Phenotype ruleset — ชั้นแปลง genotype ↔ phenotype (ฟังก์ชัน F ใน 10-algorithm-design §1)
+ * Phenotype ruleset — ชั้นแปลง genotype ↔ phenotype (ฟังก์ชัน F)
  *
- * ruleset = "ข้อมูลของโมเดล" (กฎพันธุกรรม) แยกจาก algorithm ที่คำนวณ
- * ทุก ruleset ต้องมีเวอร์ชันและสถานะ verified เพื่อ audit/replay (07-genetics-engine §MLOps)
+ * ruleset = "ข้อมูลของโมเดล" (กฎการถ่ายทอดแบบง่าย) แยกจาก algorithm ที่คำนวณ
+ * ทุก ruleset มีเวอร์ชันและ id เพื่อ audit/replay ได้
  *
- * ⚠️ verified=false หมายถึง "ยังไม่ผ่านผู้เชี่ยวชาญ (RES-01)" — engine จะไม่ใช้คำนวณผลจริง
- *    ของผู้ใช้ เว้นแต่เปิด allowUnverifiedRulesets เพื่อ "โหมดสาธิตคณิตศาสตร์" เท่านั้น
+ * โปรเจกต์นี้เป็นการทดลองความน่าจะเป็น: ชุดกฎที่มีเป็นโมเดลตำราแบบง่าย (verified=false)
+ * เปิดใช้ผ่าน allowUnverifiedRulesets ซึ่งหน้าใช้งานเปิดเป็นค่าเริ่มต้น
  */
 import type { TraitCategory } from "@/lib/validation/common";
 import type { Genotype } from "../transmission/mendelian";
@@ -21,7 +21,7 @@ export interface PhenotypeRuleset {
   /** รหัสเฉพาะของ ruleset เช่น "coat_type.fgf5_recessive_demo" */
   id: string;
   version: string;
-  /** true เมื่อผ่านการตรวจรับของผู้เชี่ยวชาญ (RES-01) แล้วเท่านั้น */
+  /** โมเดลทดลองทั้งหมดเป็น false; flag นี้สงวนไว้เผื่อมีโมเดลที่ทบทวนแล้วในอนาคต */
   verified: boolean;
   /** allele ที่เป็นไปได้ใน locus นี้ */
   alleles: readonly string[];

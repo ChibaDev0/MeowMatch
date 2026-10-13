@@ -58,4 +58,4 @@ Config แยกจาก `npm test` และต้อง opt-in project ref �
 
 ## ยังไม่ปิด Phase 5 ทั้งหมด
 
-คง `ANALYSIS_HISTORY_ENABLED` ปิดไว้ตามเดิมในแอป ยังต้องเชื่อม UI จัดเก็บ idempotency key/runId และเปิดประวัติหลัง refresh, E2E บนเว็บจริง (P5-08), benchmark/budget (P5-07), consent/DNA policy และผู้เชี่ยวชาญ (P5-02/03/05) ไม่มีการเปิดรับ DNA หรืออนุมัติกฎจริงในรอบนี้
+คง `ANALYSIS_HISTORY_ENABLED` ปิดไว้ตามเดิมในแอป ยังต้องเชื่อม UI จัดเก็บ idempotency key/runId และเปิดประวัติหลัง refresh, E2E บนเว็บจริง (P5-08) และ benchmark/budget (P5-07) · งาน consent/DNA policy และผู้เชี่ยวชาญถูกตัดออกจากขอบเขตแล้ว (ดู [scope.md](scope.md))

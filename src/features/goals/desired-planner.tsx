@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon } from "@/components/ui/icons";
 import { SelectableCat } from "@/components/ui/selectable-cat";
 import { DiscoverCard } from "@/features/discovery/discover-card";
 import type { CatView } from "@/features/cats/types";
 import type { DesiredGoalData } from "@/features/goals/types";
-import type { TargetSearchResult } from "@/domain/genetics/contracts/types";
+import type { AppearanceResult } from "@/domain/demo/appearance";
 import { saveDesiredGoalAction } from "@/server/goals/actions";
-import { analyzeTargetAction, type CandidatePoolInfo } from "@/server/analysis/target-actions";
-import type { MateSpecResult } from "@/domain/genetics/ranking/mate-spec";
-import { TargetResultView } from "./target-result";
-import { MateSpecView } from "./mate-spec-view";
+import { analyzeAppearanceAction } from "@/server/analysis/appearance-action";
+import { AppearanceResultView } from "./appearance-result";
 
 const STEPS = ["เลือกแมวของฉัน", "ตั้งเป้าหมายลูกแมว", "ผลการวิเคราะห์"];
 const COAT = ["ขนสั้น", "ขนยาว", "ไม่มีขน"];
@@ -55,10 +53,10 @@ function Dropdown({
 }
 
 /**
- * ตัววางแผนแมวที่ต้องการ (GOAL-01) — เลือกแมวต้นทาง + ตั้งเป้าหมาย แล้วบันทึกจริง
+ * ตัววางแผนแมวที่ต้องการ (GOAL-01) — เลือกแมวของฉัน + ตั้งเป้าหมายลูกแมว แล้วบันทึก
  * - แสดงเฉพาะแมวของผู้ใช้ให้เลือกเป็นต้นทาง (server ตรวจ ownership ซ้ำอีกชั้น)
- * - กู้ค่าที่เคยบันทึกจาก initialGoal
- * - "วิเคราะห์ผลลัพธ์" ยังถูกกั้นไว้จนกว่า engine ผ่านตรวจรับ (MVP-B) — ไม่แสดงเปอร์เซ็นต์
+ * - แมวต้นทางใช้ข้อมูลที่บันทึกไว้ของแมวตัวนั้น ผู้ใช้กรอกเฉพาะลักษณะลูกที่ต้องการ
+ * - กู้ค่าที่เคยบันทึกจาก initialGoal และแนะนำสเปกคู่จากความคล้ายของลักษณะภายนอก
  */
 export function DesiredPlanner({
   myCats,
@@ -77,39 +75,38 @@ export function DesiredPlanner({
   const [breed, setBreed] = useState(initialGoal?.targetBreed ?? "");
   const [eye, setEye] = useState(initialGoal?.targetEyeColor ?? "");
   const [coat, setCoat] = useState<string | null>(initialGoal?.targetCoat ?? null);
-  const [color, setColor] = useState(initialGoal?.targetColor ?? "");
   const [ear, setEar] = useState(initialGoal?.targetEarType ?? "");
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [demo, setDemo] = useState(true); // รุ่น demo: เปิด algorithm เป็นค่าเริ่มต้นให้กดแล้วเห็นผล + อ้างอิง
+  const revision = useRef(0);
   const [analyzing, startAnalyze] = useTransition();
-  const [result, setResult] = useState<TargetSearchResult | null>(null);
-  const [pool, setPool] = useState<CandidatePoolInfo | undefined>(undefined);
-  const [mateSpec, setMateSpec] = useState<MateSpecResult | undefined>(undefined);
+  const [result, setResult] = useState<AppearanceResult | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   function onAnalyze() {
     if (!source) return;
     setAnalyzeError(null);
+    const currentRevision = revision.current;
+    setResult(null);
     startAnalyze(async () => {
-      const res = await analyzeTargetAction(
-        source,
-        { coat: coat ?? "", eye, ear },
-        { demo },
-      );
+      const res = await analyzeAppearanceAction(source, { breed, eye, coat: coat ?? "", ear });
+      if (currentRevision !== revision.current) return;
       if (res.ok) {
         setResult(res.result);
-        setPool(res.pool);
-        setMateSpec(res.mateSpec);
       } else {
         setResult(null);
-        setPool(undefined);
-        setMateSpec(undefined);
         setAnalyzeError(res.error);
       }
     });
+  }
+
+  function clearResult() {
+    revision.current++;
+    setResult(null);
+    setAnalyzeError(null);
+    setSaved(false);
   }
 
   function onSave() {
@@ -120,7 +117,7 @@ export function DesiredPlanner({
     fd.set("targetBreed", breed);
     fd.set("targetEyeColor", eye);
     fd.set("targetCoat", coat ?? "");
-    fd.set("targetColor", color);
+    fd.set("targetColor", "");
     fd.set("targetEarType", ear);
 
     startTransition(async () => {
@@ -207,11 +204,10 @@ export function DesiredPlanner({
                   selected={source === cat.id}
                   badge="✓"
                   onSelect={() => {
+                    clearResult();
                     setSource((v) => (v === cat.id ? null : cat.id));
                     setSaved(false);
                     setResult(null);
-                    setPool(undefined);
-                    setMateSpec(undefined);
                     setAnalyzeError(null);
                   }}
                 />
@@ -222,8 +218,14 @@ export function DesiredPlanner({
             )}
           </div>
 
+          {source && (
+            <p className="rounded-lg bg-primary-50/60 px-3 py-2 text-xs text-muted">
+              ใช้ข้อมูลลักษณะของแมวที่คุณเลือก (สายพันธุ์ ขน สีตา และหู) เป็นแมวต้นทางโดยอัตโนมัติ
+            </p>
+          )}
+
           {/* Step 2 */}
-          <div className="space-y-4">
+          <div className="space-y-4" onChange={clearResult}>
             <h2 className="font-semibold text-ink">2. ตั้งเป้าหมายลูกแมวที่ต้องการ</h2>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -236,7 +238,6 @@ export function DesiredPlanner({
                   className={inputCls}
                 />
               </div>
-              <Dropdown label="สีตา" value={eye} onChange={setEye} options={EYE} placeholder="ไม่จำกัด" />
             </div>
             <div className="space-y-1.5">
               <span className="text-sm font-medium text-ink">ลักษณะขน</span>
@@ -245,7 +246,10 @@ export function DesiredPlanner({
                   <button
                     key={c}
                     type="button"
-                    onClick={() => setCoat((v) => (v === c ? null : c))}
+                    onClick={() => {
+                      clearResult();
+                      setCoat((v) => (v === c ? null : c));
+                    }}
                     className={`rounded-lg border px-3 py-1.5 text-sm transition ${
                       coat === c
                         ? "border-primary-500 bg-primary-50 text-primary-700"
@@ -258,17 +262,20 @@ export function DesiredPlanner({
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-ink">สีของแมว</label>
-                <input
-                  type="text"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  placeholder="ไม่จำกัด เช่น ส้ม ขาว ดำ"
-                  className={inputCls}
-                />
-              </div>
-              <Dropdown label="หู" value={ear} onChange={setEar} options={EAR} placeholder="ไม่จำกัด" />
+              <Dropdown
+                label="สีตา"
+                value={eye}
+                onChange={setEye}
+                options={EYE}
+                placeholder="ไม่จำกัด"
+              />
+              <Dropdown
+                label="หู"
+                value={ear}
+                onChange={setEar}
+                options={EAR}
+                placeholder="ไม่จำกัด"
+              />
             </div>
           </div>
 
@@ -278,25 +285,15 @@ export function DesiredPlanner({
             </p>
           )}
           {saved && !error && (
-            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700" role="status">
+            <p
+              className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700"
+              role="status"
+            >
               บันทึกเป้าหมายแล้ว
             </p>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-muted">
-            <input
-              type="checkbox"
-              checked={demo}
-              onChange={(e) => {
-                setDemo(e.target.checked);
-                setResult(null);
-                setPool(undefined);
-                setMateSpec(undefined);
-              }}
-              className="h-4 w-4 rounded border-line accent-primary-600"
-            />
-            โหมดสาธิตคณิตศาสตร์ (ใช้ชุดกฎที่ยังไม่ผ่านการตรวจรับ — ไม่ใช่ผลจริง)
-          </label>
+          <p className="text-xs text-muted">ประเมินเบื้องต้นจากความคล้ายของลักษณะภายนอก (สายพันธุ์ สีตา ขน และหู)</p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
@@ -323,8 +320,7 @@ export function DesiredPlanner({
             </p>
           )}
 
-          {mateSpec && <MateSpecView spec={mateSpec} />}
-          {result && <TargetResultView result={result} pool={pool} />}
+          {result && <AppearanceResultView result={result} />}
         </div>
       )}
     </div>

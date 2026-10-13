@@ -1,46 +1,50 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { SelectableCat } from "@/components/ui/selectable-cat";
 import { HeartIcon } from "@/components/ui/icons";
 import type { CatView } from "@/features/cats/types";
-import type { PairAnalysisResult } from "@/domain/genetics/contracts/types";
-import { analyzePairAction } from "@/server/analysis/actions";
-import { PairResultView } from "./pair-result";
+import type { PairAppearanceResult } from "@/domain/demo/pair-appearance";
+import { analyzePairAppearanceAction } from "@/server/analysis/pair-appearance-action";
+import { PairAppearanceResultView } from "./pair-appearance-result";
 
 /**
  * เลือกแมว 2 ตัวเพื่อวิเคราะห์ (PAIR-01)
  * A = แมวของฉันเท่านั้น; B = แมวของฉันหรือแมวที่กดใจ
- * ปุ่ม "วิเคราะห์ลูกแมว" เรียก engine จริงผ่าน server action แล้วแสดงผลรายลักษณะตามสถานะจริง
- * รุ่น demo: เปิดโหมดคำนวณด้วย algorithm เป็นค่าเริ่มต้น เพื่อให้กดแล้วเห็นผล + อ้างอิงที่มาได้
- * (ยังไม่ใช่ผลที่ผ่านผู้เชี่ยวชาญ — ติดป้าย "โหมดสาธิต" กำกับเสมอ; ปิด checkbox เพื่อดูสถานะจริง)
+ * อ่านรูปลักษณ์ทั้งคู่ฝั่ง server แล้วแสดงแบบจำลองขนและคำอธิบาย Gemini
+ * ผลคำขอเก่าจะไม่แสดงหลังผู้ใช้เปลี่ยนคู่
  */
 export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; likedCats: CatView[] }) {
   const [a, setA] = useState<string | null>(null);
   const [bTab, setBTab] = useState<"mine" | "liked">("mine");
   const [b, setB] = useState<string | null>(null);
-  const [demo, setDemo] = useState(true);
-  const [result, setResult] = useState<PairAnalysisResult | null>(null);
+  const [result, setResult] = useState<PairAppearanceResult | null>(null);
+  const revision = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const bList = bTab === "mine" ? myCats : likedCats;
-  const ready = a !== null && b !== null && !(bTab === "mine" && a === b);
+  const ready = a !== null && b !== null && a !== b;
 
   const reset = () => {
+    revision.current++;
     setResult(null);
     setError(null);
   };
 
   const runAnalysis = () => {
-    if (!a || !b) return;
+    if (!a || !b || !ready) return;
+    const requestRevision = ++revision.current;
     startTransition(async () => {
       setError(null);
-      const res = await analyzePairAction(a, b, { demo });
-      if (res.ok) setResult(res.result);
-      else {
-        setResult(null);
-        setError(res.error);
+      setResult(null);
+      try {
+        const res = await analyzePairAppearanceAction(a, b);
+        if (requestRevision !== revision.current) return;
+        if (res.ok) setResult(res.result);
+        else setError(res.error);
+      } catch {
+        if (requestRevision === revision.current) setError("วิเคราะห์ไม่สำเร็จ กรุณาลองใหม่");
       }
     });
   };
@@ -121,18 +125,7 @@ export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; liked
       </div>
 
       <div className="space-y-3">
-        <label className="flex items-center gap-2 text-sm text-muted">
-          <input
-            type="checkbox"
-            checked={demo}
-            onChange={(e) => {
-              setDemo(e.target.checked);
-              reset();
-            }}
-            className="h-4 w-4 rounded border-line accent-primary-600"
-          />
-          โหมดสาธิตคณิตศาสตร์ (ใช้ชุดกฎที่ยังไม่ผ่านการตรวจรับ — ไม่ใช่ผลจริง)
-        </label>
+        <p className="text-sm text-muted">ใช้ข้อมูลแมวทั้งสองตัวเพื่อดูสีขน ลายขน ความยาวขน สีตา และหูที่ลูกอาจมี</p>
 
         <button
           type="button"
@@ -151,7 +144,7 @@ export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; liked
         </div>
       )}
 
-      {result && <PairResultView result={result} />}
+      {result && <PairAppearanceResultView result={result} />}
     </div>
   );
 }

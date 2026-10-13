@@ -1,6 +1,10 @@
-# Phase 7 algorithm API (research only)
+# Research algorithm API (experimental, out of scope)
 
-Server-side TypeScript kernels. No empirical feline priors, approved phenotype mapping, or breeding recommendations are embedded here. Entry points are not wired to application routes. Production registry remains empty.
+> **Out of current scope.** MeowMatch is a probability experiment (see [docs/scope.md](../../../docs/scope.md)).
+> These kernels (VE / DP / Monte Carlo) are experimental leftovers, **not wired to the app** and not part
+> of the product. No expert review or DNA is involved. Kept only as a sandbox; safe to ignore or remove.
+
+Server-side TypeScript kernels. No empirical feline priors or breeding recommendations are embedded here. Entry points are not wired to application routes. The registry is empty.
 
 ## Bayesian inference
 
@@ -69,4 +73,4 @@ Outputs include `phase7-0.2.0`, model id/version, SHA256 of the full model and S
 
 `runRegisteredAlgorithm` resolves only the installed registry through the existing gate and requires review provenance. There is no unverified/model override parameter. It currently returns unsupported because the registry is empty. Even a future approved model still returns research-labelled results until release engineering promotes/snapshots the code. Neither runner is wired to pair/target or UI.
 
-Tests: `npx vitest run src/research/genetics`. Benchmark: `npx vitest run --config vitest.benchmark.config.ts tests/benchmarks/phase7.test.ts` (writes `docs/benchmarks/phase7-algorithms.json`). See [handoff](../../../docs/phase-7-research-handoff.md) for evidence and remaining release work.
+Tests: `npx vitest run src/research/genetics`. Benchmark: `npx vitest run --config vitest.benchmark.config.ts tests/benchmarks/phase7.test.ts`. This code is experimental and out of the current project scope (see [docs/scope.md](../../../docs/scope.md)).
