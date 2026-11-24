@@ -22,7 +22,7 @@ export type QueryCapture = {
 
 function makeQuery(result: QueryResult, capture: QueryCapture) {
   const q: Record<string, unknown> = {};
-  for (const m of ["or", "order", "range", "in", "limit", "neq"]) {
+  for (const m of ["or", "order", "range", "in", "limit", "neq", "ilike"]) {
     q[m] = vi.fn(() => q);
   }
   q.select = vi.fn(() => {

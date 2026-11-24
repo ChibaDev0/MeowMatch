@@ -46,3 +46,7 @@ yarn-error.log*
 
 .vercel
 .env*
+
+# python (nlp-service)
+nlp-service/.venv/
+__pycache__/

@@ -11,6 +11,11 @@ import type { AppearanceResult } from "@/domain/demo/appearance";
 import { saveDesiredGoalAction } from "@/server/goals/actions";
 import { analyzeAppearanceAction } from "@/server/analysis/appearance-action";
 import { AppearanceResultView } from "./appearance-result";
+import { GoalTextInput, type GoalTextValues } from "./goal-text-input";
+import { COLOR_LABELS } from "@/domain/genes/model";
+import type { MatePlan } from "@/domain/genes/plan";
+import { planMateGenesAction } from "@/server/genes/actions";
+import { MatePlanView } from "@/features/genes/mate-plan-view";
 
 const STEPS = ["เลือกแมวของฉัน", "ตั้งเป้าหมายลูกแมว", "ผลการวิเคราะห์"];
 const COAT = ["ขนสั้น", "ขนยาว", "ไม่มีขน"];
@@ -76,6 +81,9 @@ export function DesiredPlanner({
   const [eye, setEye] = useState(initialGoal?.targetEyeColor ?? "");
   const [coat, setCoat] = useState<string | null>(initialGoal?.targetCoat ?? null);
   const [ear, setEar] = useState(initialGoal?.targetEarType ?? "");
+  const [color, setColor] = useState(initialGoal?.targetColor ?? "");
+  const [plan, setPlan] = useState<MatePlan | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,16 +96,24 @@ export function DesiredPlanner({
   function onAnalyze() {
     if (!source) return;
     setAnalyzeError(null);
+    setPlanError(null);
     const currentRevision = revision.current;
     setResult(null);
+    setPlan(null);
+    const hasAppearanceGoal = [breed, eye, coat ?? "", ear].some(Boolean);
     startAnalyze(async () => {
-      const res = await analyzeAppearanceAction(source, { breed, eye, coat: coat ?? "", ear });
+      const [res, genes] = await Promise.all([
+        hasAppearanceGoal ? analyzeAppearanceAction(source, { breed, eye, coat: coat ?? "", ear }) : null,
+        planMateGenesAction(source, { breed, eye, coat: coat ?? "", ear, color }),
+      ]);
       if (currentRevision !== revision.current) return;
-      if (res.ok) {
+      if (genes.ok) setPlan(genes.result);
+      else setPlanError(genes.error);
+      if (res?.ok) {
         setResult(res.result);
       } else {
         setResult(null);
-        setAnalyzeError(res.error);
+        if (res) setAnalyzeError(res.error);
       }
     });
   }
@@ -106,7 +122,19 @@ export function DesiredPlanner({
     revision.current++;
     setResult(null);
     setAnalyzeError(null);
+    setPlan(null);
+    setPlanError(null);
     setSaved(false);
+  }
+
+  /** ค่าจากช่องพิมพ์ภาษาไทย (NLP) — กรอกเฉพาะช่องที่ตรวจพบ ช่องอื่นคงค่าเดิม */
+  function applyGoalText(values: GoalTextValues) {
+    clearResult();
+    if (values.breed !== undefined) setBreed(values.breed);
+    if (values.coat !== undefined) setCoat(values.coat || null);
+    if (values.eye !== undefined) setEye(values.eye);
+    if (values.ear !== undefined) setEar(values.ear);
+    if (values.color !== undefined) setColor(values.color);
   }
 
   function onSave() {
@@ -117,7 +145,7 @@ export function DesiredPlanner({
     fd.set("targetBreed", breed);
     fd.set("targetEyeColor", eye);
     fd.set("targetCoat", coat ?? "");
-    fd.set("targetColor", "");
+    fd.set("targetColor", color);
     fd.set("targetEarType", ear);
 
     startTransition(async () => {
@@ -227,6 +255,7 @@ export function DesiredPlanner({
           {/* Step 2 */}
           <div className="space-y-4" onChange={clearResult}>
             <h2 className="font-semibold text-ink">2. ตั้งเป้าหมายลูกแมวที่ต้องการ</h2>
+            <GoalTextInput onApply={applyGoalText} />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium text-ink">สายพันธุ์</label>
@@ -276,6 +305,13 @@ export function DesiredPlanner({
                 options={EAR}
                 placeholder="ไม่จำกัด"
               />
+              <Dropdown
+                label="สีขน (คำนวณจากยีน)"
+                value={color}
+                onChange={setColor}
+                options={[...COLOR_LABELS]}
+                placeholder="ไม่จำกัด"
+              />
             </div>
           </div>
 
@@ -293,7 +329,9 @@ export function DesiredPlanner({
             </p>
           )}
 
-          <p className="text-xs text-muted">ประเมินเบื้องต้นจากความคล้ายของลักษณะภายนอก (สายพันธุ์ สีตา ขน และหู)</p>
+          <p className="text-xs text-muted">
+            คำนวณ 2 แบบ: ยีนจำลอง (ขน หู สีขน ตาสีฟ้า → บอกแมวคู่ที่ต้องหาและโอกาส) และความคล้ายของลักษณะภายนอก
+          </p>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <button
@@ -320,6 +358,12 @@ export function DesiredPlanner({
             </p>
           )}
 
+          {planError && (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+              คำนวณจากยีนไม่ได้: {planError}
+            </p>
+          )}
+          {plan && <MatePlanView plan={plan} />}
           {result && <AppearanceResultView result={result} />}
         </div>
       )}

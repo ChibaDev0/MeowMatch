@@ -1,4 +1,5 @@
 import type { CatSex } from "@/lib/validation/common";
+import type { GeneMap } from "@/domain/genes/model";
 
 /**
  * รูปแบบข้อมูลแมวที่หน้า UI ใช้แสดงผล (view model)
@@ -13,6 +14,8 @@ export type CatView = {
   coat: string;
   coatColor?: string;
   coatPattern?: string;
+  /** ยีนจำลองที่เจ้าของระบุ (ไม่ใช่ผล DNA) */
+  genes?: GeneMap;
   eye: string;
   ear: string;
   sex: CatSex;
@@ -39,6 +42,7 @@ export type CatEditData = {
   coat: string | null;
   coatColor?: string;
   coatPattern?: string;
+  genes?: GeneMap;
   eyeColor: string;
   earType: string;
   temperament: string;

@@ -3,41 +3,31 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { DiscoverFilterPanel } from "@/features/discovery/discover-filters";
 import { DiscoverCard } from "@/features/discovery/discover-card";
-import { getDiscoverBreeds, getDiscoverCats, type DiscoverFilters } from "@/server/cats/queries";
+import { geneMatchStatus, getDiscoverBreeds, getDiscoverCats } from "@/server/cats/queries";
+import { discoverHref, parseDiscoverParams } from "@/features/discovery/params";
+import { describeGenotype, formatGenotype, type Code, type LocusId } from "@/domain/genes/model";
 
 export const metadata: Metadata = { title: "หาคู่" };
 
-/** รับค่าตัวกรองจาก searchParams (string | string[] | undefined → string | undefined) */
-function one(v: string | string[] | undefined): string | undefined {
-  const s = Array.isArray(v) ? v[0] : v;
-  return s && s.trim() !== "" ? s : undefined;
-}
-
-/** สร้าง querystring สำหรับลิงก์แบ่งหน้า โดยคงตัวกรองเดิมไว้ */
-function pageHref(filters: DiscoverFilters, page: number): string {
-  const params = new URLSearchParams();
-  if (filters.breed) params.set("breed", filters.breed);
-  if (filters.eye) params.set("eye", filters.eye);
-  if (filters.coat) params.set("coat", filters.coat);
-  if (filters.ear) params.set("ear", filters.ear);
-  if (page > 1) params.set("page", String(page));
-  const qs = params.toString();
-  return qs ? `/discover?${qs}` : "/discover";
-}
 
 export default async function DiscoverPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const sp = await searchParams;
-  const filters: DiscoverFilters = {
-    breed: one(sp.breed),
-    eye: one(sp.eye),
-    coat: one(sp.coat),
-    ear: one(sp.ear),
-  };
-  const page = Math.max(1, Number(one(sp.page)) || 1);
+  const { page, fromGenes, ...filters } = parseDiscoverParams(await searchParams);
+  const pageHref = (f: typeof filters, p: number) => discoverHref({ ...f, fromGenes }, p);
+  const wantedGenes = Object.entries(filters.genes ?? {}) as [LocusId, Code][];
+  const specText = [
+    filters.sex === "male" ? "เพศผู้" : filters.sex === "female" ? "เพศเมีย" : "",
+    filters.breed,
+    filters.coat,
+    filters.ear,
+    filters.color && `สี${filters.color}`,
+    filters.pattern,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const [result, breeds] = await Promise.all([
     getDiscoverCats({ filters, page }),
@@ -55,9 +45,22 @@ export default async function DiscoverPage({
       <PageHeader title="หาคู่" subtitle="ค้นหาแมวจากผู้ใช้คนอื่น ๆ" />
 
       <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-        <DiscoverFilterPanel breeds={breeds} initial={filters} />
+        <DiscoverFilterPanel breeds={breeds} initial={filters} fromGenes={fromGenes} />
 
         <section className="space-y-4">
+          {fromGenes && (
+            <div className="rounded-2xl border border-primary-200 bg-primary-50 p-4 text-sm" role="status">
+              <p className="font-medium text-primary-800">🧬 ค้นหาตามผลคำนวณยีน</p>
+              {specText && <p className="mt-1 text-ink">{specText}</p>}
+              {wantedGenes.length > 0 && (
+                <p className="mt-1 text-xs text-muted">
+                  ยีนที่ซ่อนอยู่ซึ่งควรมี:{" "}
+                  {wantedGenes.map(([l, c]) => `${formatGenotype(l, c)} (${describeGenotype(l, c)})`).join(", ")}
+                  {filters.geneMatch ? " · แสดงเฉพาะแมวที่เจ้าของบันทึกยีนตรง" : " · แมวที่บันทึกยีนตรงจะมีป้าย ✓"}
+                </p>
+              )}
+            </div>
+          )}
           <p className="text-sm text-muted">
             {result.total > 0
               ? `พบ ${result.total} ตัว · แสดง ${rangeStart}–${rangeEnd}`
@@ -67,7 +70,7 @@ export default async function DiscoverPage({
           {result.cats.length > 0 ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {result.cats.map((cat, i) => (
-                <DiscoverCard key={cat.id} cat={cat} seed={i} />
+                <DiscoverCard key={cat.id} cat={cat} seed={i} geneMatch={geneMatchStatus(cat, filters.genes)} />
               ))}
             </div>
           ) : (

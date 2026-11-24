@@ -66,3 +66,48 @@ test.describe("พื้นที่สมาชิก (authenticated)", () => {
     await expect(page.getByTestId("sidebar").getByText("ศูนย์ดูแลชุมชน")).toHaveCount(0);
   });
 });
+
+test.describe("เป้าหมายจากข้อความภาษาไทย (Thai NLP)", () => {
+  for (const viewport of [
+    { name: "desktop", width: 1280, height: 900 },
+    { name: "mobile", width: 390, height: 844 },
+  ]) {
+    test(`พิมพ์ข้อความแล้วกรอกฟอร์มเป้าหมายให้ (${viewport.name})`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/desired-cats");
+      await page
+        .getByLabel("พิมพ์บอกลูกแมวที่อยากได้ (ภาษาไทย)")
+        .fill("อยากได้ลูกแมวสก็อตติชโฟลด์ขนยาวตาสีฟ้า แต่ไม่เอาหูพับนะครับ");
+      await page.getByRole("button", { name: "แปลงข้อความเป็นเป้าหมาย" }).click();
+
+      const result = page.getByRole("region", { name: "ผลวิเคราะห์ข้อความ" });
+      await expect(result).toBeVisible();
+      await expect(page.getByPlaceholder("ไม่จำกัด")).toHaveValue("สก็อตติชโฟลด์");
+      await expect(page.getByRole("combobox").first()).toHaveValue("ตาสีฟ้า");
+      await expect(page.getByRole("combobox").nth(1)).toHaveValue("หูตั้ง");
+      await page.getByRole("button", { name: /ดูขั้นตอน NLP/ }).click();
+      await expect(page.getByRole("list", { name: "คำที่ตัดได้" })).toContainText("สก็อตติชโฟลด์");
+      if (process.env.E2E_SCREENSHOT_DIR)
+        await page
+          .locator("#goal-text")
+          .locator("xpath=..")
+          .screenshot({ path: `${process.env.E2E_SCREENSHOT_DIR}/nlp-${viewport.name}.png` });
+    });
+  }
+});
+
+test.describe("แมวตัวอย่าง 100 ตัว + ค้นหาจากผลยีน", () => {
+  test("หน้าหาคู่แสดงแมวตัวอย่างพร้อมรูป และกรองตามเพศ/สี/ยีนได้", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto("/discover");
+    await expect(page.getByText(/พบ \d{3,} ตัว/)).toBeVisible();
+    await expect(page.locator('img[src*="cats%2Fseed"], img[src*="/cats/seed/"]').first()).toBeVisible();
+
+    await page.goto("/discover?sex=female&color=" + encodeURIComponent("สามสี") + "&from=genes&genes=O.Aa");
+    await expect(page.getByText("ค้นหาตามผลคำนวณยีน")).toBeVisible();
+    await expect(page.getByText("✓ ยีนตรงตามที่ต้องการ").first()).toBeVisible();
+    await expect(page.getByText("เพศผู้ ·")).toHaveCount(0);
+    if (process.env.E2E_SCREENSHOT_DIR)
+      await page.screenshot({ path: `${process.env.E2E_SCREENSHOT_DIR}/discover-genes.png`, fullPage: true });
+  });
+});

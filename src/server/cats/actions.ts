@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { CAT_SEX } from "@/lib/validation/common";
 import { removeCatPhoto, uploadCatPhoto } from "./photos";
+import { sanitizeGenes, validateGenes, type GeneMap } from "@/domain/genes/model";
 
 /**
  * Server Actions ของแมว (CAT-01 / MEDIA-01 / FAV-01) — เวอร์ชัน MVP
@@ -32,7 +33,44 @@ const catFields = {
   eyeColor: z.preprocess(emptyToNull, z.string().trim().nullable()).default(null),
   earType: z.preprocess(emptyToNull, z.string().trim().nullable()).default(null),
   temperament: z.preprocess(emptyToNull, z.string().trim().max(500).nullable()).default(null),
+  /** ยีนจำลอง: JSON {locus: code} — ตรวจความสอดคล้องกับหน้าตาใน withGeneCheck */
+  genes: z
+    .preprocess((v) => {
+      if (typeof v !== "string" || !v.trim()) return {};
+      try {
+        return JSON.parse(v);
+      } catch {
+        return null;
+      }
+    }, z.record(z.string()).nullable())
+    .default({}),
 } as const;
+
+/** ยีนที่ระบุต้องเป็นรหัสที่รู้จัก และเข้ากับเพศ/หน้าตาที่กรอก */
+function geneIssues(v: {
+  sex: "male" | "female" | "unknown";
+  coat: string | null;
+  earType: string | null;
+  eyeColor: string | null;
+  coatColor: string | null;
+  coatPattern: string | null;
+  genes: Record<string, string> | null;
+}): { genes: GeneMap; error?: string } {
+  if (v.genes === null) return { genes: {}, error: "ข้อมูลยีนไม่ถูกต้อง" };
+  const genes = sanitizeGenes(v.genes);
+  if (Object.keys(genes).length !== Object.keys(v.genes).length) return { genes, error: "รหัสยีนไม่ถูกต้อง" };
+  const errors = validateGenes(
+    { sex: v.sex, coat: v.coat, ear: v.earType, eye: v.eyeColor, coatColor: v.coatColor, coatPattern: v.coatPattern },
+    genes,
+  );
+  return errors.length ? { genes, error: errors[0] } : { genes };
+}
+
+/** PostgREST/Postgres: คอลัมน์ genes ยังไม่มี (ยังไม่รัน migration 20261110120000_cat_genes.sql) */
+function missingGenesColumn(error: { code?: string; message?: string } | null): boolean {
+  return (error?.code === "PGRST204" || error?.code === "42703") && /genes/.test(error?.message ?? "genes");
+}
+const GENES_PENDING = "บันทึกแมวแล้ว แต่ยังบันทึกยีนจำลองไม่ได้ (ต้องรัน migration 20261110120000_cat_genes.sql)";
 
 const createCatFormSchema = z
   .object(catFields)
@@ -61,6 +99,7 @@ function readCatFields(fd: FormData): Record<string, FormDataEntryValue | null> 
     eyeColor: fd.get("eyeColor"),
     earType: fd.get("earType"),
     temperament: fd.get("temperament"),
+    genes: fd.get("genes"),
   };
 }
 
@@ -95,6 +134,8 @@ export async function createCatAction(fd: FormData): Promise<ActionResult> {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง", fieldErrors: toFieldErrors(parsed.error) };
   }
   const v = parsed.data;
+  const geneCheck = geneIssues(v);
+  if (geneCheck.error) return { ok: false, error: geneCheck.error, fieldErrors: { genes: geneCheck.error } };
 
   const supabase = await createClient();
   const {
@@ -111,7 +152,7 @@ export async function createCatAction(fd: FormData): Promise<ActionResult> {
     photoKey = up.key;
   }
 
-  const { error } = await supabase.from("cats").insert({
+  const row = {
     owner_id: user.id,
     name: v.name,
     breed: v.breed,
@@ -124,7 +165,13 @@ export async function createCatAction(fd: FormData): Promise<ActionResult> {
     ear_type: v.earType,
     temperament: v.temperament,
     photo_path: photoKey,
-  });
+  };
+  let genesPending = false;
+  let { error } = await supabase.from("cats").insert({ ...row, genes: geneCheck.genes });
+  if (error && missingGenesColumn(error)) {
+    genesPending = Object.keys(geneCheck.genes).length > 0;
+    ({ error } = await supabase.from("cats").insert(row));
+  }
 
   if (error) {
     if (photoKey) await removeCatPhoto(supabase, photoKey); // cleanup รูปที่อัปโหลดค้าง
@@ -133,7 +180,7 @@ export async function createCatAction(fd: FormData): Promise<ActionResult> {
   }
 
   revalidateCatPages();
-  return { ok: true, message: "เพิ่มแมวสำเร็จ" };
+  return { ok: true, message: genesPending ? GENES_PENDING : "เพิ่มแมวสำเร็จ" };
 }
 
 export async function updateCatAction(fd: FormData): Promise<ActionResult> {
@@ -142,6 +189,8 @@ export async function updateCatAction(fd: FormData): Promise<ActionResult> {
     return { ok: false, error: "ข้อมูลไม่ถูกต้อง", fieldErrors: toFieldErrors(parsed.error) };
   }
   const v = parsed.data;
+  const geneCheck = geneIssues(v);
+  if (geneCheck.error) return { ok: false, error: geneCheck.error, fieldErrors: { genes: geneCheck.error } };
 
   const supabase = await createClient();
   const {
@@ -189,7 +238,16 @@ export async function updateCatAction(fd: FormData): Promise<ActionResult> {
     ...(newPhotoKey ? { photo_path: newPhotoKey } : removePhoto ? { photo_path: null } : {}),
   };
 
-  const { error } = await supabase.from("cats").update(payload).eq("id", v.id).eq("owner_id", user.id);
+  let genesPending = false;
+  let { error } = await supabase
+    .from("cats")
+    .update(fd.has("genes") ? { ...payload, genes: geneCheck.genes } : payload)
+    .eq("id", v.id)
+    .eq("owner_id", user.id);
+  if (error && fd.has("genes") && missingGenesColumn(error)) {
+    genesPending = Object.keys(geneCheck.genes).length > 0;
+    ({ error } = await supabase.from("cats").update(payload).eq("id", v.id).eq("owner_id", user.id));
+  }
 
   if (error) {
     if (newPhotoKey) await removeCatPhoto(supabase, newPhotoKey); // cleanup รูปใหม่ที่ค้าง
@@ -200,7 +258,7 @@ export async function updateCatAction(fd: FormData): Promise<ActionResult> {
   if (newPhotoKey || removePhoto) await removeCatPhoto(supabase, existing.photo_path);
 
   revalidateCatPages();
-  return { ok: true, message: "บันทึกการแก้ไขสำเร็จ" };
+  return { ok: true, message: genesPending ? GENES_PENDING : "บันทึกการแก้ไขสำเร็จ" };
 }
 
 export async function deleteCatAction(catId: string): Promise<ActionResult> {

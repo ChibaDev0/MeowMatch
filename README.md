@@ -16,6 +16,7 @@
 - **Supabase** — PostgreSQL + Auth (Google/password) + Storage, บังคับสิทธิ์ด้วย RLS
 - **Zod + React Hook Form** — validation ที่ใช้ร่วม client/server (server ตัดสิน)
 - **Vitest** (unit/integration) + **Playwright** (E2E)
+- **Thai NLP** — แปลงข้อความภาษาไทยเป็นเป้าหมายลูกแมว (ตัดคำ/POS/entity) + PyThaiNLP service (ไม่บังคับ) — ดู [docs/nlp/README.md](docs/nlp/README.md)
 
 ## เริ่มต้นพัฒนา
 
@@ -43,8 +44,10 @@ src/
     supabase/          client / server / admin / middleware
     validation/        Zod schemas
   domain/genetics/     engine บริสุทธิ์ (transmission, inference, constraints, ranking, …)
+  domain/nlp/          Thai NLP บริสุทธิ์ (normalize, ตัดคำ, POS, entity/slot)
   types/database.ts    generated จาก Supabase schema
 supabase/              migrations / seed / tests
+nlp-service/           PyThaiNLP service (FastAPI) + experiment.py
 tests/e2e/             Playwright
 ```
 

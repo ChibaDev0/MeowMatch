@@ -1,0 +1,9 @@
+pythainlp==5.4.0
+python-crfsuite
+fastapi
+uvicorn[standard]
+# สำหรับ experiment.py เท่านั้น (เปรียบเทียบกับ TLTK)
+tltk
+pandas
+requests
+scikit-learn>=1.5  # tltk ติดตั้ง 1.2.2 ซึ่งไม่เข้ากับ numpy 2

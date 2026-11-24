@@ -37,6 +37,8 @@ export type CatRow = {
   coat: string | null;
   coat_color?: string | null;
   coat_pattern?: string | null;
+  /** ยีนจำลองที่เจ้าของระบุ (20261110120000_cat_genes) — ไม่ใช่ผล DNA */
+  genes?: Record<string, string> | null;
   eye_color: string | null;
   ear_type: string | null;
   temperament: string | null;
@@ -153,6 +155,7 @@ export type Database = {
           coat?: string | null;
           coat_color?: string | null;
           coat_pattern?: string | null;
+          genes?: Record<string, string>;
           eye_color?: string | null;
           ear_type?: string | null;
           temperament?: string | null;
@@ -170,6 +173,7 @@ export type Database = {
           coat?: string | null;
           coat_color?: string | null;
           coat_pattern?: string | null;
+          genes?: Record<string, string>;
           eye_color?: string | null;
           ear_type?: string | null;
           temperament?: string | null;

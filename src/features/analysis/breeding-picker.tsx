@@ -7,6 +7,9 @@ import type { CatView } from "@/features/cats/types";
 import type { PairAppearanceResult } from "@/domain/demo/pair-appearance";
 import { analyzePairAppearanceAction } from "@/server/analysis/pair-appearance-action";
 import { PairAppearanceResultView } from "./pair-appearance-result";
+import type { PairGeneResult } from "@/domain/genes/cross";
+import { simulatePairGenesAction } from "@/server/genes/actions";
+import { GeneCrossResultView } from "@/features/genes/gene-cross-result";
 
 /**
  * เลือกแมว 2 ตัวเพื่อวิเคราะห์ (PAIR-01)
@@ -19,6 +22,7 @@ export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; liked
   const [bTab, setBTab] = useState<"mine" | "liked">("mine");
   const [b, setB] = useState<string | null>(null);
   const [result, setResult] = useState<PairAppearanceResult | null>(null);
+  const [genes, setGenes] = useState<PairGeneResult | null>(null);
   const revision = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -29,12 +33,20 @@ export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; liked
   const reset = () => {
     revision.current++;
     setResult(null);
+    setGenes(null);
     setError(null);
   };
 
   const runAnalysis = () => {
     if (!a || !b || !ready) return;
     const requestRevision = ++revision.current;
+    setGenes(null);
+    // จำลองยีนเร็ว (ไม่รอคำอธิบาย AI) — แสดงทันทีที่ได้ผล
+    simulatePairGenesAction(a, b)
+      .then((res) => {
+        if (requestRevision === revision.current && res.ok) setGenes(res.result);
+      })
+      .catch(() => {});
     startTransition(async () => {
       setError(null);
       setResult(null);
@@ -144,6 +156,7 @@ export function BreedingPicker({ myCats, likedCats }: { myCats: CatView[]; liked
         </div>
       )}
 
+      {genes && <GeneCrossResultView result={genes} />}
       {result && <PairAppearanceResultView result={result} />}
     </div>
   );

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { CameraIcon, ChevronDownIcon, TrashIcon } from "@/components/ui/icons";
 import { createCatAction, updateCatAction } from "@/server/cats/actions";
 import type { CatEditData } from "./types";
+import { GeneEditor } from "@/features/genes/gene-editor";
+import { COLOR_LABELS, pruneGenes, type GeneMap } from "@/domain/genes/model";
 
 const COAT = ["ขนสั้น", "ขนยาว", "ไม่มีขน"];
 const EYE = ["ตาสีฟ้า", "ตาสีทอง", "ตาสีเขียว", "ตาสีน้ำตาล", "ตาสองสี"];
@@ -84,6 +86,18 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
   const [eye, setEye] = useState(initial?.eyeColor ?? "");
   const [ear, setEar] = useState(initial?.earType ?? "");
   const [temperament, setTemperament] = useState(initial?.temperament ?? "");
+  const [genes, setGenes] = useState<GeneMap>(initial?.genes ?? {});
+  const appearance = {
+    sex: sex as "male" | "female" | "unknown",
+    coat,
+    ear,
+    eye,
+    coatColor,
+    coatPattern,
+  };
+  // ยีนที่เลือกไว้แต่ไม่เข้ากับหน้าตาใหม่ (เช่น เปลี่ยนเป็นขนยาว) จะถูกตัดออกอัตโนมัติ
+  const validGenes = pruneGenes(appearance, genes);
+  const colorOptions = [...COLOR_LABELS, ...(coatColor && !(COLOR_LABELS as readonly string[]).includes(coatColor) ? [coatColor] : [])];
 
   // รูป: ไฟล์ใหม่ที่เลือก (preview ผ่าน object URL) / รูปเดิม / สถานะลบรูปเดิม
   const [file, setFile] = useState<File | null>(null);
@@ -131,6 +145,7 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
     fd.set("eyeColor", eye);
     fd.set("earType", ear);
     fd.set("temperament", temperament);
+    fd.set("genes", JSON.stringify(validGenes));
     if (file) fd.set("photo", file);
     if (mode === "edit" && initial) {
       fd.set("id", initial.id);
@@ -308,16 +323,30 @@ export function CatForm({ mode, initial }: { mode: "create" | "edit"; initial?: 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label htmlFor="coat-color" className="text-sm font-medium text-ink">สีขน</label>
-            <input id="coat-color" value={coatColor} onChange={(e) => setCoatColor(e.target.value)} maxLength={80} placeholder="เช่น ดำ, ส้ม, เทา, ขาวดำ" className={inputCls} />
+            <select
+              id="coat-color"
+              value={coatColor}
+              onChange={(e) => setCoatColor(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">ไม่ทราบ / ไม่ระบุ</option>
+              {colorOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
             {fieldErrors.coatColor && <p className="text-xs text-rose-500">{fieldErrors.coatColor}</p>}
           </div>
           <div className="space-y-1.5">
             <label htmlFor="coat-pattern" className="text-sm font-medium text-ink">ลวดลายขน</label>
-            <input id="coat-pattern" value={coatPattern} onChange={(e) => setCoatPattern(e.target.value)} maxLength={80} placeholder="เช่น สีพื้น, ลายสลิด, แต้มขาว, สามสี" className={inputCls} />
+            <input id="coat-pattern" value={coatPattern} onChange={(e) => setCoatPattern(e.target.value)} maxLength={80} placeholder="เช่น สีพื้น, ลายสลิด, แต้มสี (แบบวิเชียรมาศ)" className={inputCls} />
             {fieldErrors.coatPattern && <p className="text-xs text-rose-500">{fieldErrors.coatPattern}</p>}
           </div>
         </div>
         <p className="text-xs text-muted">สีและลายขนใช้ประกอบการวิเคราะห์ลูกแมว หากไม่ทราบให้เว้นว่าง</p>
+
+        <GeneEditor appearance={appearance} genes={validGenes} onChange={setGenes} error={fieldErrors.genes} />
 
         <div className="space-y-1.5">
           <label className="text-sm font-medium text-ink">ลักษณะนิสัย</label>

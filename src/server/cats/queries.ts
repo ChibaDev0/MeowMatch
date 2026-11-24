@@ -4,6 +4,7 @@ import type { CatRow } from "@/types/database";
 import type { CatEditData, CatView } from "@/features/cats/types";
 import { DEMO_DISCOVER_CATS, DEMO_MY_CATS } from "@/features/cats/demo";
 import { catPhotoSrc } from "./photos";
+import { POINT_LABEL, sanitizeGenes, type GeneMap, type LocusId } from "@/domain/genes/model";
 
 /**
  * ชั้นอ่านข้อมูลแมวจากฐานข้อมูลจริง (ตาราง public.cats / public.cat_likes)
@@ -36,6 +37,7 @@ function toView(row: CatRow, liked = false): CatView {
     coat: row.coat ?? "—",
     coatColor: row.coat_color ?? "",
     coatPattern: row.coat_pattern ?? "",
+    genes: sanitizeGenes(row.genes),
     eye: row.eye_color ?? "—",
     ear: row.ear_type ?? "—",
     sex: row.sex,
@@ -83,6 +85,7 @@ export async function getCatForEdit(id: string): Promise<CatEditData | null> {
     coat: data.coat,
     coatColor: data.coat_color ?? "",
     coatPattern: data.coat_pattern ?? "",
+    genes: sanitizeGenes(data.genes),
     eyeColor: data.eye_color ?? "",
     earType: data.ear_type ?? "",
     temperament: data.temperament ?? "",
@@ -123,7 +126,24 @@ export type DiscoverFilters = {
   coat?: string;
   eye?: string;
   ear?: string;
+  sex?: "male" | "female";
+  color?: string;
+  /** แต้มสี (colorpoint) — ค้นจาก coat_pattern ที่มีคำว่า "แต้ม" */
+  pattern?: string;
+  /** ยีนที่ต้องการจากผลคำนวณ (ใช้แสดงว่าแมวตัวไหนบันทึกยีนตรง) */
+  genes?: GeneMap;
+  /** true = แสดงเฉพาะแมวที่บันทึกยีนตรงตาม genes */
+  geneMatch?: boolean;
 };
+
+/** แมวบันทึกยีนตรงกับที่ต้องการไหม: true = ตรงครบ, false = บันทึกไว้แต่ไม่ตรง, null = ยังไม่บันทึก */
+export function geneMatchStatus(cat: CatView, wanted?: GeneMap): boolean | null {
+  const entries = Object.entries(wanted ?? {}) as [LocusId, string][];
+  if (!entries.length) return null;
+  const genes = cat.genes ?? {};
+  if (entries.some(([l, c]) => genes[l] && genes[l] !== c)) return false;
+  return entries.every(([l, c]) => genes[l] === c) ? true : null;
+}
 
 export type DiscoverPage = {
   cats: CatView[];
@@ -142,7 +162,11 @@ export function applyDemoFilters(cats: CatView[], f: DiscoverFilters): CatView[]
       (!f.breed || c.breed === f.breed) &&
       (!f.coat || c.coat === f.coat) &&
       (!f.eye || c.eye === f.eye) &&
-      (!f.ear || c.ear === f.ear),
+      (!f.ear || c.ear === f.ear) &&
+      (!f.sex || c.sex === f.sex) &&
+      (!f.color || c.coatColor === f.color) &&
+      (!f.pattern || (c.coatPattern ?? "").includes("แต้ม")) &&
+      (!f.geneMatch || geneMatchStatus(c, f.genes) === true),
   );
 }
 
@@ -175,6 +199,11 @@ export async function getDiscoverCats(
   if (filters.coat) q = q.eq("coat", filters.coat);
   if (filters.eye) q = q.eq("eye_color", filters.eye);
   if (filters.ear) q = q.eq("ear_type", filters.ear);
+  if (filters.sex) q = q.eq("sex", filters.sex);
+  if (filters.color) q = q.eq("coat_color", filters.color);
+  if (filters.pattern === POINT_LABEL) q = q.ilike("coat_pattern", "%แต้ม%");
+  if (filters.geneMatch)
+    for (const [locus, code] of Object.entries(filters.genes ?? {})) q = q.eq(`genes->>${locus}`, code);
   q = q.range(from, to);
 
   const { data, error, count } = await q;
